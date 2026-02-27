@@ -329,14 +329,26 @@ body,
   bottom: 1rem;
   left: 1rem;
   right: 1rem;
-  height: 200px;
+  height: 220px;
   /* fixed chart height */
   background: white;
+  color: #333;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   border-radius: 4px;
   overflow: hidden;
   z-index: 1000;
   opacity: 0.95;
+}
+
+.overlay-chart .u-marker {
+  height: 2px !important;
+  width: 20px !important;
+  border-radius: 1px !important;
+}
+
+.map-wrapper:has(.overlay-chart) .leaflet-bottom.leaflet-right {
+  transition: bottom 0.2s;
+  bottom: 160px;
 }
 
 .leaflet-container *,

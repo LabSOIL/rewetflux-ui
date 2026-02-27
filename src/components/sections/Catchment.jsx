@@ -24,6 +24,8 @@ export default function Catchment({
   bounds,
   centroid,
   defaultColour,
+  onZoom,
+  sensorLoading,
 }) {
     return (
     <>
@@ -60,7 +62,13 @@ export default function Catchment({
             </MapContainer>
             {sensorSeries && (selectedData === 'Temperature' || selectedData === 'Moisture') && (
               <div className="overlay-chart">
-                <TimeseriesPlot series={sensorSeries} dataOption={selectedData} />
+                <TimeseriesPlot
+                  series={sensorSeries}
+                  dataOption={selectedData}
+                  onZoom={onZoom}
+                  loading={sensorLoading}
+                  resolution={sensorSeries.resolution}
+                />
               </div>
             )}
           </div>
