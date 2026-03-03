@@ -19,10 +19,18 @@ import 'leaflet/dist/leaflet.css'
 const DEPTH_TEMPERATURE_CM = 10;
 const DEPTH_MOISTURE_CM = 10;
 
+// Which sensor profile_type to show for each data option
+const PROFILE_TYPE_FOR_DATA = {
+  Temperature: 'tms',
+  Moisture: 'tms',
+  GasFlux: 'chamber',
+  Redox: 'redox',
+};
 
-const dataAccessors = {
-  Temperature: plot => plot.temperature,
-  Moisture: plot => plot.soilMoisture,
+// Fixed marker colours for data types without an average value scale
+const FIXED_MARKER_COLOR = {
+  GasFlux: '#d62728',
+  Redox: '#2ca02c',
 };
 
 export function CatchmentLayers({
@@ -40,15 +48,35 @@ export function CatchmentLayers({
 }) {
   const map = useMap()
   const [hasZoomed, setHasZoomed] = useState(false)
+  const prevAreasLengthRef = useRef(0)
 
-  // common: fly to bounds when area changes
+  // Helper: compute padded bounds that fit all area polygons
+  const allAreaBounds = (areaList) => {
+    const coords = areaList
+      .filter(a => a.geom?.coordinates)
+      .flatMap(a => a.geom.coordinates.flatMap(ring => ring.map(([lng, lat]) => [lat, lng])));
+    return coords.length ? L.latLngBounds(coords).pad(0.15) : null;
+  };
+
+  // Auto-fit to all areas on first load (no user interaction required)
+  useEffect(() => {
+    if (!areas.length || prevAreasLengthRef.current > 0 || activeAreaId) return;
+    prevAreasLengthRef.current = areas.length;
+    const fitAll = () => {
+      const b = allAreaBounds(areas);
+      if (b) map.fitBounds(b);
+    };
+    map._loaded ? fitAll() : map.once('load', fitAll);
+  }, [areas]);
+
+  // Fly to bounds when area selection changes
   useEffect(() => {
     if (!areas.length || !recenterSignal) return;
     setHasZoomed(false);
 
     const doFly = () => {
       if (activeAreaId) {
-        // fly to the selected catchment's padded bounds
+        // fly to the selected area's padded bounds
         const coords = areas
           .find(a => a.id === activeAreaId)
           ?.geom.coordinates.flatMap(ring => ring.map(([lng, lat]) => [lat, lng]));
@@ -58,8 +86,13 @@ export function CatchmentLayers({
           onRecenterHandled();
         });
       } else {
-        // no activeAreaId -> fly to Balmoos center
-        map.flyTo(centroid, 13, { duration: 1 });
+        // no activeAreaId -> fit all available areas
+        const b = allAreaBounds(areas);
+        if (b) {
+          map.flyToBounds(b, { duration: 1 });
+        } else {
+          map.flyTo(centroid, 13, { duration: 1 });
+        }
         map.once('moveend', () => {
           setHasZoomed(true);
           onRecenterHandled();
@@ -143,48 +176,65 @@ export function CatchmentLayers({
               )}
             </Polygon>
 
-            {isActive && hasZoomed && ['Temperature', 'Moisture'].includes(dataOption) &&
-              area.sensors.map(sensor => {
-                const c = sensor.geom['4326']; if (!c) return null
-                const { x: lon, y: lat } = c
-                const avg = dataOption === 'Temperature'
-                  ? sensor.average_temperature
-                  : sensor.average_moisture;
-                const depth = dataOption === 'Temperature'
-                  ? DEPTH_TEMPERATURE_CM
-                  : DEPTH_MOISTURE_CM;
-                const valueAtDepth = avg?.[depth] ?? null;
-                const clr = valueAtDepth != null ? getColor(valueAtDepth) : defaultColour;
+            {isActive && hasZoomed && PROFILE_TYPE_FOR_DATA[dataOption] &&
+              area.sensors
+                .filter(s => s.profile_type === PROFILE_TYPE_FOR_DATA[dataOption])
+                .map(sensor => {
+                  const c = sensor.geom['4326']; if (!c) return null
+                  const { x: lon, y: lat } = c
 
-                return (
-                  <CircleMarker
-                    key={sensor.id}
-                    center={[lat, lon]}
-                    pathOptions={{ color: clr, fillColor: clr, fillOpacity: 1 }}
-                    radius={8}
-                    eventHandlers={{ click: () => onSensorClick(sensor.id) }}
-                  >
-                    <Popup eventHandlers={{ remove: () => onSensorClose() }}>
-                      <strong>{sensor.name}</strong><br /><br />
-                      {Object.entries(avg || {}).map(([d, v]) => (
-                        <div key={d}>
-                          <strong>{d} cm</strong>: {v.toFixed(2)}
-                          {dataOption === 'Temperature' ? ' °C' : ' m³/m³'}
-                        </div>
-                      ))}
-                    </Popup>
-                  </CircleMarker>
-                )
-              })
+                  let clr;
+                  let popupExtra = null;
+                  if (dataOption === 'Temperature' || dataOption === 'Moisture') {
+                    const avg = dataOption === 'Temperature'
+                      ? sensor.average_temperature
+                      : sensor.average_moisture;
+                    const depth = dataOption === 'Temperature'
+                      ? DEPTH_TEMPERATURE_CM
+                      : DEPTH_MOISTURE_CM;
+                    const valueAtDepth = avg?.[depth] ?? null;
+                    clr = valueAtDepth != null ? getColor(valueAtDepth) : defaultColour;
+                    popupExtra = (
+                      <>
+                        <br /><br />
+                        {Object.entries(avg || {}).map(([d, v]) => (
+                          <div key={d}>
+                            <strong>{d} cm</strong>: {v.toFixed(2)}
+                            {dataOption === 'Temperature' ? ' \u00b0C' : ' m\u00b3/m\u00b3'}
+                          </div>
+                        ))}
+                      </>
+                    );
+                  } else {
+                    clr = FIXED_MARKER_COLOR[dataOption] || defaultColour;
+                  }
+
+                  return (
+                    <CircleMarker
+                      key={sensor.id}
+                      center={[lat, lon]}
+                      pathOptions={{ color: clr, fillColor: clr, fillOpacity: 1 }}
+                      radius={8}
+                      eventHandlers={{ click: () => onSensorClick(sensor.id) }}
+                    >
+                      <Popup eventHandlers={{ remove: () => onSensorClose() }}>
+                        <strong>{sensor.name}</strong>
+                        {popupExtra}
+                      </Popup>
+                    </CircleMarker>
+                  )
+                })
             }
 
-            <Legend
-              dataOption={dataOption}
-              title={legendTitles[dataOption] || dataOption}
-              colorScale={colorScale}
-              minVal={minVal}
-              maxVal={maxVal}
-            />
+            {(dataOption === 'Temperature' || dataOption === 'Moisture') && (
+              <Legend
+                dataOption={dataOption}
+                title={legendTitles[dataOption] || dataOption}
+                colorScale={colorScale}
+                minVal={minVal}
+                maxVal={maxVal}
+              />
+            )}
           </React.Fragment>
         )
       })}

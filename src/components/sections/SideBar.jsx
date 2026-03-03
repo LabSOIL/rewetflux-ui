@@ -6,10 +6,10 @@ import 'leaflet-geotiff';
 import 'leaflet/dist/leaflet.css';
 
 const dataOptions = [
-  { key: 'Temperature', color: '#ff7f00' },
-  { key: 'Moisture', color: '#1f77b4' },
-  // Phase 2: { key: 'GasFlux', color: '#d62728' },
-  // Phase 2: { key: 'Redox', color: '#2ca02c' },
+  { key: 'GasFlux', color: '#d62728', label: 'Gas Flux' },
+  { key: 'Redox', color: '#2ca02c', label: 'Redox' },
+  { key: 'Temperature', color: '#ff7f00', label: 'Temperature' },
+  { key: 'Moisture', color: '#1f77b4', label: 'Moisture' },
 ];
 const modelOptions = [];
 
@@ -84,7 +84,7 @@ export default function SideBar({
           ...item,
           subItems: activeAreaId
             ? viewMode === 'experimental'
-              ? dataOptions.map(o => ({ key: o.key, label: o.key }))
+              ? dataOptions.map(o => ({ key: o.key, label: o.label || o.key }))
               : modelOptions
             : [],
         };

@@ -9,10 +9,10 @@ import Cover from './components/sections/Cover';
 import SideBar from './components/sections/SideBar';
 
 const dataOptions = [
-  { key: 'Temperature', color: '#ff7f00' },
-  { key: 'Moisture', color: '#1f77b4' },
-  // Phase 2: { key: 'GasFlux', color: '#d62728' },
-  // Phase 2: { key: 'Redox', color: '#2ca02c' },
+  { key: 'GasFlux', color: '#d62728', label: 'Gas Flux' },
+  { key: 'Redox', color: '#2ca02c', label: 'Redox' },
+  { key: 'Temperature', color: '#ff7f00', label: 'Temperature' },
+  { key: 'Moisture', color: '#1f77b4', label: 'Moisture' },
 ];
 const modelOptions = [];
 
@@ -50,11 +50,15 @@ export default function App() {
       endpoint = `/api/public/sensors/${sensorId}/temperature?website=${WEBSITE_SLUG}`;
     } else if (dataType === 'Moisture') {
       endpoint = `/api/public/sensors/${sensorId}/moisture?website=${WEBSITE_SLUG}`;
+    } else if (dataType === 'GasFlux') {
+      endpoint = `/api/public/sensors/${sensorId}/flux?website=${WEBSITE_SLUG}`;
+    } else if (dataType === 'Redox') {
+      endpoint = `/api/public/sensors/${sensorId}/redox?website=${WEBSITE_SLUG}`;
     } else {
       return;
     }
 
-    if (zoom) {
+    if (zoom && (dataType === 'Temperature' || dataType === 'Moisture')) {
       endpoint += `&start=${encodeURIComponent(zoom.start)}&end=${encodeURIComponent(zoom.end)}`;
     }
 
@@ -106,7 +110,10 @@ export default function App() {
   useEffect(() => {
     fetch(`/api/public/areas?website=${WEBSITE_SLUG}`)
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
-      .then(data => setAreas(data))
+      .then(data => {
+        setAreas(data);
+        if (data.length === 1) selectArea(data[0].id, true);
+      })
       .catch(console.error);
   }, []);
 

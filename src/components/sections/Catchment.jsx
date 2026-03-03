@@ -4,6 +4,8 @@ import {
 } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import TimeseriesPlot from '../timeseries/TimeseriesPlot';
+import FluxPlot from '../timeseries/FluxPlot';
+import RedoxPlot from '../timeseries/RedoxPlot';
 import 'leaflet-geotiff';
 import 'leaflet/dist/leaflet.css'
 import { CatchmentLayers } from '../maps/Catchment';
@@ -69,6 +71,16 @@ export default function Catchment({
                   loading={sensorLoading}
                   resolution={sensorSeries.resolution}
                 />
+              </div>
+            )}
+            {sensorSeries && selectedData === 'GasFlux' && (
+              <div className="overlay-chart">
+                <FluxPlot series={sensorSeries} loading={sensorLoading} />
+              </div>
+            )}
+            {sensorSeries && selectedData === 'Redox' && (
+              <div className="overlay-chart">
+                <RedoxPlot series={sensorSeries} loading={sensorLoading} />
               </div>
             )}
           </div>
