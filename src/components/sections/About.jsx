@@ -23,7 +23,7 @@ export default function About({ sectionsRef }) {
                         sx={{ fontSize: "1rem", mb: 1.5, lineHeight: 1.6, textAlign: "justify" }}
                     >
                         RewetFlux provides access to environmental monitoring data from the
-                        Balmoos wetland site (46.964°N, 8.060°E) in Lucerne, Switzerland.
+                        Balmoos wetland site in Lucerne, Switzerland.
                         The project tracks greenhouse gas fluxes, soil redox conditions, and
                         microclimate variables to understand carbon dynamics in rewetted peatlands.
                     </Typography>
@@ -113,12 +113,12 @@ export default function About({ sectionsRef }) {
                                 rel="noopener noreferrer"
                                 sx={{ fontSize: "1rem" }}
                             >
-                                E4S — Excellence in Energy
+                                E4S — Enterprise for Society Center
                             </Link>
                         </ListItem>
                         <ListItem disableGutters sx={{ py: 0.3 }}>
                             <Link
-                                href="https://www.pronatura.ch"
+                                href="https://www.pronatura-lu.ch/de/balmoos-regeneration-hochmoor"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 sx={{ fontSize: "1rem" }}

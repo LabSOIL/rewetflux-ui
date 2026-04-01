@@ -48,7 +48,7 @@ export default function Cover({ sectionsRef }) {
             >
               <img
                 src="/e4s.svg"
-                alt="E4S Logo"
+                alt="Enterprise for Society Center Logo"
               />
             </a>
             <a
