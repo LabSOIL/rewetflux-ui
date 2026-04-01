@@ -231,26 +231,29 @@ export default function SideBar({
                         >
                           {s.label}
                         </button>
+                        {selectedData === 'Redox' && s.key === 'Redox' && (
+                          <ul className="sub-menu">
+                            <li>
+                              <button
+                                className={`submenu-btn ${redoxDepth === 'top' ? 'active-data' : ''}`}
+                                onClick={() => setRedoxDepth('top')}
+                              >
+                                Top
+                              </button>
+                            </li>
+                            <li>
+                              <button
+                                className={`submenu-btn ${redoxDepth === 'bottom' ? 'active-data' : ''}`}
+                                onClick={() => setRedoxDepth('bottom')}
+                              >
+                                Bottom
+                              </button>
+                            </li>
+                          </ul>
+                        )}
                       </li>
                     ))}
                   </ul>
-
-                  {selectedData === 'Redox' && (
-                    <div className="redox-depth-toggle">
-                      <button
-                        className={`depth-btn ${redoxDepth === 'top' ? 'active' : ''}`}
-                        onClick={() => setRedoxDepth('top')}
-                      >
-                        Top
-                      </button>
-                      <button
-                        className={`depth-btn ${redoxDepth === 'bottom' ? 'active' : ''}`}
-                        onClick={() => setRedoxDepth('bottom')}
-                      >
-                        Bottom
-                      </button>
-                    </div>
-                  )}
 
                   <hr
                     style={{
