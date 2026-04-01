@@ -39,18 +39,26 @@ export default function Cover({ sectionsRef }) {
               <img
                 src="/epfl.png"
                 alt="EPFL Logo"
-                style={{ height: '2rem', marginRight: '1rem' }}
               />
             </a>
             <a
-              href="https://www.snf.ch"
+              href="https://e4s.center/"
               target="_blank"
               rel="noopener noreferrer"
             >
               <img
-                src="/snsf.svg"
-                alt="SNSF Logo"
-                style={{ height: '2rem' }}
+                src="/e4s.svg"
+                alt="E4S Logo"
+              />
+            </a>
+            <a
+              href="https://www.pronatura-lu.ch/de/balmoos-regeneration-hochmoor"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <img
+                src="/pronatura.svg"
+                alt="Pro Natura Logo"
               />
             </a>
           </div>

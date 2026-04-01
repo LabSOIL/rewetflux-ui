@@ -23,7 +23,7 @@ export default function About({ sectionsRef }) {
                         sx={{ fontSize: "1rem", mb: 1.5, lineHeight: 1.6, textAlign: "justify" }}
                     >
                         RewetFlux provides access to environmental monitoring data from the
-                        Balmoos wetland site (46.964°N, 8.060°E) in Nidwalden, Switzerland.
+                        Balmoos wetland site (46.964°N, 8.060°E) in Lucerne, Switzerland.
                         The project tracks greenhouse gas fluxes, soil redox conditions, and
                         microclimate variables to understand carbon dynamics in rewetted peatlands.
                     </Typography>
@@ -56,17 +56,15 @@ export default function About({ sectionsRef }) {
                         paragraph
                         sx={{ fontSize: "1rem", mb: 1.5, lineHeight: 1.6, textAlign: "justify" }}
                     >
-                        <strong>Gas flux</strong> measurements (CO₂, CH₄, N₂O) are collected using
-                        a LI-7810 IRGA chamber system at each collar position. Flux values are
-                        computed from chamber headspace concentration changes over time.
+                        <strong>Gas flux</strong> measurements are collected at each collar position.
                     </Typography>
                     <Typography
                         variant="body1"
                         paragraph
                         sx={{ fontSize: "1rem", mb: 1.5, lineHeight: 1.6, textAlign: "justify" }}
                     >
-                        <strong>Redox potential</strong> is measured at four depths (5, 15, 25, 35 cm)
-                        to characterise soil aeration and biogeochemical conditions across the wetland.
+                        <strong>Redox potential</strong> is measured at multiple depths to characterise 
+                        soil aeration and biogeochemical conditions across the wetland.
                     </Typography>
 
                     <Typography
@@ -95,7 +93,7 @@ export default function About({ sectionsRef }) {
                                 rel="noopener noreferrer"
                                 sx={{ fontSize: "1rem" }}
                             >
-                                CHANGE — Laboratory of Construction and Architecture, EPFL
+                                CHANGE — Laboratory of Catchment Hydrology and Geomorphology, EPFL
                             </Link>
                         </ListItem>
                         <ListItem disableGutters sx={{ py: 0.3 }}>
@@ -110,12 +108,22 @@ export default function About({ sectionsRef }) {
                         </ListItem>
                         <ListItem disableGutters sx={{ py: 0.3 }}>
                             <Link
-                                href="https://www.snf.ch"
+                                href="https://e4s.center/"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 sx={{ fontSize: "1rem" }}
                             >
-                                SNSF — Swiss National Science Foundation
+                                E4S — Excellence in Energy
+                            </Link>
+                        </ListItem>
+                        <ListItem disableGutters sx={{ py: 0.3 }}>
+                            <Link
+                                href="https://www.pronatura.ch"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                sx={{ fontSize: "1rem" }}
+                            >
+                                Pro Natura
                             </Link>
                         </ListItem>
                         <br />

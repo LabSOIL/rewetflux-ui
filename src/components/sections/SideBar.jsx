@@ -29,7 +29,7 @@ export default function SideBar({
   const [activeSection, setActiveSection] = useState('cover');
   const [menuItems, setMenuItems] = useState([
     { key: 'cover', label: 'Home' },
-    { key: 'catchment', label: 'Catchment', subItems: [] },
+    { key: 'catchment', label: 'Balmoos' },
     { key: 'data', label: 'Data', subItems: [] },
     { key: 'about', label: 'About' },
   ]);
@@ -66,16 +66,7 @@ export default function SideBar({
     }
   }, [activeSection]);
 
-  useEffect(() => {
-    if (activeSection === 'catchment' && areas.length) {
-      const subs = areas.map(a => ({ key: a.id, label: a.name }));
-      setMenuItems(items =>
-        items.map(item =>
-          item.key === 'catchment' ? { ...item, subItems: subs } : item
-        )
-      );
-    }
-  }, [activeSection, areas]);
+
 
   useEffect(() => {
     setMenuItems(items =>
@@ -136,9 +127,6 @@ export default function SideBar({
                   type="button"
                   className="menu-btn"
                   onClick={() => {
-                    if (item.key === 'catchment' || item.key === 'about') {
-                      clearArea();
-                    }
                     scrollTo(item.key);
                   }}
                 >
@@ -148,39 +136,6 @@ export default function SideBar({
                     item.label
                   )}
                 </button>
-              )}
-
-              {item.key === 'catchment' && activeSection === 'catchment' && (
-                <ul className="sub-menu">
-                  {item.subItems.map(s => (
-                    <li
-                      key={s.key}
-                      className={activeAreaId === s.key ? 'active-area' : ''}
-                    >
-                      <button
-                        className={`submenu-btn ${
-                          activeAreaId === s.key ? 'active-data' : ''
-                        }`}
-                        onClick={() => {
-                          selectArea(s.key, true);
-                        }}
-                      >
-                        {s.label}
-                      </button>
-                      {activeAreaId === s.key && (
-                        <button
-                          className="remove-selected"
-                          onClick={() => {
-                            clearArea();
-                            scrollTo('catchment');
-                          }}
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </li>
-                  ))}
-                </ul>
               )}
 
               {item.key === 'data' && activeAreaId && (
@@ -227,7 +182,10 @@ export default function SideBar({
                           className={`submenu-btn ${
                             selectedData === s.key ? 'active-data' : ''
                           }`}
-                          onClick={() => selectData(s.key)}
+                          onClick={() => {
+                            selectData(s.key);
+                            scrollTo('catchment');
+                          }}
                         >
                           {s.label}
                         </button>
@@ -236,7 +194,10 @@ export default function SideBar({
                             <li>
                               <button
                                 className={`submenu-btn ${redoxDepth === 'top' ? 'active-data' : ''}`}
-                                onClick={() => setRedoxDepth('top')}
+                                onClick={() => {
+                                  setRedoxDepth('top');
+                                  scrollTo('catchment');
+                                }}
                               >
                                 Top
                               </button>
@@ -244,7 +205,10 @@ export default function SideBar({
                             <li>
                               <button
                                 className={`submenu-btn ${redoxDepth === 'bottom' ? 'active-data' : ''}`}
-                                onClick={() => setRedoxDepth('bottom')}
+                                onClick={() => {
+                                  setRedoxDepth('bottom');
+                                  scrollTo('catchment');
+                                }}
                               >
                                 Bottom
                               </button>

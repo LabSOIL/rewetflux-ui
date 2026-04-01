@@ -52,9 +52,6 @@ export default function App() {
   };
 
   const clearArea = () => {
-    setActiveAreaId(null);
-    setSelectedData(null);
-    setShouldRecenter(true);
   };
 
   const selectData = key => {

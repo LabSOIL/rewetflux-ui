@@ -35,8 +35,9 @@ export default function Catchment({
           <div className="map-wrapper">
             <MapContainer
               center={centroid}
-              zoom={13}
-              minZoom={11}
+              zoom={15}
+              minZoom={8}
+              maxZoom={18}
               scrollWheelZoom
               className="leaflet-container"
               maxBounds={bounds}
