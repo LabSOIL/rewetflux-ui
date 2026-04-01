@@ -29,7 +29,6 @@ export default function SideBar({
   const [activeSection, setActiveSection] = useState('cover');
   const [menuItems, setMenuItems] = useState([
     { key: 'cover', label: 'Home' },
-    { key: 'catchment', label: 'Balmoos' },
     { key: 'data', label: 'Data', subItems: [] },
     { key: 'about', label: 'About' },
   ]);
@@ -39,8 +38,10 @@ export default function SideBar({
   const [thumbStyle, setThumbStyle] = useState({ left: 0, width: 0 });
 
   const scrollTo = key => {
-    const idx = menuItems.findIndex(i => i.key === key);
-    sectionsRef.current[idx]?.scrollIntoView({ behavior: 'smooth' });
+    const section = sectionsRef.current.find(
+      el => el && el.dataset.section === key
+    );
+    section?.scrollIntoView({ behavior: 'smooth' });
   };
 
   useEffect(() => {
@@ -143,11 +144,16 @@ export default function SideBar({
                   <hr
                     style={{
                       width: '90%',
-                      margin: '1rem auto',
-                      marginLeft: '0',
+                      margin: '1rem auto 0.5rem 0',
                       display: 'block',
                     }}
                   />
+                  <button
+                    className={`submenu-btn site-title ${activeSection === 'catchment' ? 'active-data' : ''}`}
+                    onClick={() => scrollTo('catchment')}
+                  >
+                    Balmoos
+                  </button>
                   {modelOptions.length > 0 && (
                     <div className="mode-switch">
                       <div
