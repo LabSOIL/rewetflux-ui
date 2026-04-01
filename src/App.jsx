@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import './App.css';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-geotiff';
@@ -28,6 +28,23 @@ export default function App() {
   const [redoxDepth, setRedoxDepth] = useState('top');
   const [shouldRecenter, setShouldRecenter] = useState(false);
   const sectionsRef = useRef([]);
+
+  const redoxRange = useMemo(() => {
+    if (!activeAreaId || selectedData !== 'Redox') return { min: 0, max: 1 };
+    
+    const activeArea = areas.find(a => a.id === activeAreaId);
+    if (!activeArea) return { min: 0, max: 1 };
+    
+    const redoxSensors = activeArea.sensors.filter(s => s.profile_type === 'redox' && s.redox);
+    const allValues = redoxSensors.flatMap(s => [s.redox.top, s.redox.bottom]).filter(v => v != null);
+    
+    if (allValues.length === 0) return { min: 0, max: 1 };
+    
+    return {
+      min: Math.min(...allValues),
+      max: Math.max(...allValues),
+    };
+  }, [areas, activeAreaId, selectedData]);
 
   const selectArea = (id, recenter = false) => {
     if (recenter) setShouldRecenter(true);
@@ -104,6 +121,8 @@ export default function App() {
           centroid={CENTROID_BALMOOS}
           defaultColour={DEFAULT_COLOUR}
           redoxDepth={redoxDepth}
+          redoxMin={redoxRange.min}
+          redoxMax={redoxRange.max}
         />
         <About sectionsRef={sectionsRef} />
       </main>

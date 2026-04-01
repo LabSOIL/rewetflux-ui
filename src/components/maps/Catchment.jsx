@@ -12,18 +12,13 @@ import { BaseLayers } from './Layers';
 import chroma from 'chroma-js';
 import Legend from './Legend';
 import 'leaflet-geotiff';
-import 'leaflet/dist/leaflet.css'
+import 'leaflet/dist/leaflet.css';
+import { colormap, getColorScale, getPalette } from '../../utils/colourMap';
 
 const PROFILE_TYPE_FOR_DATA = {
   Temperature: 'chamber',
   Moisture: 'chamber',
   Redox: 'redox',
-};
-
-const FIXED_MARKER_COLOR = {
-  Redox: '#2ca02c',
-  Temperature: '#ff7f00',
-  Moisture: '#1f77b4',
 };
 
 export function CatchmentLayers({
@@ -37,10 +32,12 @@ export function CatchmentLayers({
   centroid,
   defaultColour,
   redoxDepth,
+  redoxMin,
+  redoxMax,
 }) {
-  const map = useMap()
-  const [hasZoomed, setHasZoomed] = useState(false)
-  const prevAreasLengthRef = useRef(0)
+  const map = useMap();
+  const [hasZoomed, setHasZoomed] = useState(false);
+  const prevAreasLengthRef = useRef(0);
 
   const allAreaBounds = (areaList) => {
     const coords = areaList
@@ -112,31 +109,45 @@ export function CatchmentLayers({
       return { minVal: 0, maxVal: 1 };
     }
 
+    if (dataOption === 'Redox') {
+      return { minVal: redoxMin, maxVal: redoxMax };
+    }
+
     return { minVal: 0, maxVal: 1 };
-  }, [areas, activeAreaId, dataOption]);
+  }, [areas, activeAreaId, dataOption, redoxMin, redoxMax]);
 
   const legendTitles = {
     Temperature: 'Temperature [°C]',
     Moisture: 'Moisture [VWC]',
+    Redox: 'Redox [mV]',
   };
 
   const colorScale = useMemo(() => {
+    if (dataOption === 'Redox') {
+      return getColorScale('redox', minVal, maxVal);
+    }
     return chroma
-      .scale(['#ffffcc', '#c2e699', '#31a354', '#006837'])
+      .scale(getPalette(dataOption === 'Temperature' ? 'temperature' : 'moisture'))
       .domain([minVal, maxVal]);
   }, [dataOption, minVal, maxVal]);
-  const getColor = v => colorScale(v).hex()
+
+  const getColor = (v, palette) => {
+    if (dataOption === 'Redox') {
+      return colormap(v, minVal, maxVal, 'redox') || defaultColour;
+    }
+    return colorScale(v).hex();
+  };
 
   return (
     <>
       <BaseLayers />
 
       {areas.map(area => {
-        if (!area.geom?.coordinates) return null
+        if (!area.geom?.coordinates) return null;
         const positions = area.geom.coordinates.map(
           ring => ring.map(([lng, lat]) => [lat, lng])
-        )
-        const isActive = area.id === activeAreaId
+        );
+        const isActive = area.id === activeAreaId;
 
         return (
           <React.Fragment key={area.id}>
@@ -144,11 +155,11 @@ export function CatchmentLayers({
               positions={positions}
               pathOptions={{
                 fillOpacity: 0.25,
-                color: isActive ? '#2b8cbe' : defaultColour
+                color: isActive ? '#2b8cbe' : defaultColour,
               }}
               eventHandlers={{
                 add: e => e.target.bringToBack(),
-                click: () => !isActive && onAreaClick(area.id, true)
+                click: () => !isActive && onAreaClick(area.id, true),
               }}
             >
               {!isActive && (
@@ -164,28 +175,43 @@ export function CatchmentLayers({
               area.sensors
                 .filter(s => s.profile_type === PROFILE_TYPE_FOR_DATA[dataOption])
                 .map(sensor => {
-                  const c = sensor.geom['4326']; if (!c) return null
-                  const { x: lon, y: lat } = c
+                  const c = sensor.geom['4326'];
+                  if (!c) return null;
+                  const { x: lon, y: lat } = c;
 
                   let clr;
                   let popupContent;
-                  
+
                   if (dataOption === 'Redox') {
-                    clr = FIXED_MARKER_COLOR.Redox;
-                    const value = sensor.redox?.[redoxDepth];
-                    popupContent = value != null 
-                      ? `${redoxDepth.charAt(0).toUpperCase() + redoxDepth.slice(1)}: ${value} mV`
-                      : 'No data';
+                    const topVal = sensor.redox?.top;
+                    const bottomVal = sensor.redox?.bottom;
+                    const activeVal = redoxDepth === 'top' ? topVal : bottomVal;
+                    
+                    clr = activeVal != null ? getColor(activeVal) : defaultColour;
+                    
+                    const topDisplay = topVal != null ? topVal.toFixed(1) : 'N/A';
+                    const bottomDisplay = bottomVal != null ? bottomVal.toFixed(1) : 'N/A';
+                    
+                    popupContent = (
+                      <>
+                        <div style={{ fontWeight: redoxDepth === 'top' ? 'bold' : 'normal' }}>
+                          Top: {topDisplay} mV
+                        </div>
+                        <div style={{ fontWeight: redoxDepth === 'bottom' ? 'bold' : 'normal' }}>
+                          Bottom: {bottomDisplay} mV
+                        </div>
+                      </>
+                    );
                   } else if (dataOption === 'Temperature') {
                     const value = sensor.temperature;
                     clr = value != null ? getColor(value) : defaultColour;
-                    popupContent = value != null 
+                    popupContent = value != null
                       ? `${value.toFixed(1)} °C`
                       : 'No data';
                   } else if (dataOption === 'Moisture') {
                     const value = sensor.moisture;
                     clr = value != null ? getColor(value) : defaultColour;
-                    popupContent = value != null 
+                    popupContent = value != null
                       ? `${(value * 100).toFixed(1)} %`
                       : 'No data';
                   } else {
@@ -206,11 +232,11 @@ export function CatchmentLayers({
                         {popupContent}
                       </Popup>
                     </CircleMarker>
-                  )
+                  );
                 })
             }
 
-            {(dataOption === 'Temperature' || dataOption === 'Moisture') && (
+            {(dataOption === 'Temperature' || dataOption === 'Moisture' || dataOption === 'Redox') && (
               <Legend
                 dataOption={dataOption}
                 title={legendTitles[dataOption] || dataOption}
@@ -220,8 +246,8 @@ export function CatchmentLayers({
               />
             )}
           </React.Fragment>
-        )
+        );
       })}
     </>
-  )
+  );
 }

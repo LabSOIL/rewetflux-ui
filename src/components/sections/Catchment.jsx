@@ -21,6 +21,8 @@ export default function Catchment({
   centroid,
   defaultColour,
   redoxDepth,
+  redoxMin,
+  redoxMax,
 }) {
     return (
     <>
@@ -52,6 +54,8 @@ export default function Catchment({
                 centroid={centroid}
                 defaultColour={defaultColour}
                 redoxDepth={redoxDepth}
+                redoxMin={redoxMin}
+                redoxMax={redoxMax}
               />
             </MapContainer>
           </div>
