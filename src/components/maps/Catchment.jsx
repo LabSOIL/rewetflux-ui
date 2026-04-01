@@ -14,23 +14,16 @@ import Legend from './Legend';
 import 'leaflet-geotiff';
 import 'leaflet/dist/leaflet.css'
 
-// As there are more than one depth value (10, 30cm usually), we must only display one in the map,
-// so we define the depth for temperature and moisture here
-const DEPTH_TEMPERATURE_CM = 10;
-const DEPTH_MOISTURE_CM = 10;
-
-// Which sensor profile_type to show for each data option
 const PROFILE_TYPE_FOR_DATA = {
-  Temperature: 'tms',
-  Moisture: 'tms',
-  GasFlux: 'chamber',
+  Temperature: 'chamber',
+  Moisture: 'chamber',
   Redox: 'redox',
 };
 
-// Fixed marker colours for data types without an average value scale
 const FIXED_MARKER_COLOR = {
-  GasFlux: '#d62728',
   Redox: '#2ca02c',
+  Temperature: '#ff7f00',
+  Moisture: '#1f77b4',
 };
 
 export function CatchmentLayers({
@@ -38,19 +31,17 @@ export function CatchmentLayers({
   activeAreaId,
   dataOption,
   onAreaClick,
-  onSensorClick,
-  onSensorClose,
   recenterSignal,
   onRecenterHandled,
   bounds,
   centroid,
   defaultColour,
+  redoxDepth,
 }) {
   const map = useMap()
   const [hasZoomed, setHasZoomed] = useState(false)
   const prevAreasLengthRef = useRef(0)
 
-  // Helper: compute padded bounds that fit all area polygons
   const allAreaBounds = (areaList) => {
     const coords = areaList
       .filter(a => a.geom?.coordinates)
@@ -58,7 +49,6 @@ export function CatchmentLayers({
     return coords.length ? L.latLngBounds(coords).pad(0.15) : null;
   };
 
-  // Auto-fit to all areas on first load (no user interaction required)
   useEffect(() => {
     if (!areas.length || prevAreasLengthRef.current > 0 || activeAreaId) return;
     prevAreasLengthRef.current = areas.length;
@@ -69,14 +59,12 @@ export function CatchmentLayers({
     map._loaded ? fitAll() : map.once('load', fitAll);
   }, [areas]);
 
-  // Fly to bounds when area selection changes
   useEffect(() => {
     if (!areas.length || !recenterSignal) return;
     setHasZoomed(false);
 
     const doFly = () => {
       if (activeAreaId) {
-        // fly to the selected area's padded bounds
         const coords = areas
           .find(a => a.id === activeAreaId)
           ?.geom.coordinates.flatMap(ring => ring.map(([lng, lat]) => [lat, lng]));
@@ -86,7 +74,6 @@ export function CatchmentLayers({
           onRecenterHandled();
         });
       } else {
-        // no activeAreaId -> fit all available areas
         const b = allAreaBounds(areas);
         if (b) {
           map.flyToBounds(b, { duration: 1 });
@@ -109,13 +96,10 @@ export function CatchmentLayers({
         ? areas.find(a => a.id === activeAreaId)?.sensors || []
         : areas.flatMap(a => a.sensors)
       )
+        .filter(s => s.profile_type === PROFILE_TYPE_FOR_DATA[dataOption])
         .map(s => {
-          const depths =
-            dataOption === 'Temperature'
-              ? s.average_temperature || {}
-              : s.average_moisture || {};
-          const temp_depths = depths[DEPTH_TEMPERATURE_CM];
-          return typeof temp_depths === 'number' ? temp_depths : null;
+          const val = dataOption === 'Temperature' ? s.temperature : s.moisture;
+          return typeof val === 'number' ? val : null;
         })
         .filter(v => v != null);
 
@@ -132,8 +116,8 @@ export function CatchmentLayers({
   }, [areas, activeAreaId, dataOption]);
 
   const legendTitles = {
-    Temperature: `Avg. temperature (${DEPTH_TEMPERATURE_CM} cm)<br/>[°C]`,
-    Moisture: `Moisture (${DEPTH_MOISTURE_CM} cm)<br/>[VWC (m³/m³)]`,
+    Temperature: 'Temperature [°C]',
+    Moisture: 'Moisture [VWC]',
   };
 
   const colorScale = useMemo(() => {
@@ -184,29 +168,29 @@ export function CatchmentLayers({
                   const { x: lon, y: lat } = c
 
                   let clr;
-                  let popupExtra = null;
-                  if (dataOption === 'Temperature' || dataOption === 'Moisture') {
-                    const avg = dataOption === 'Temperature'
-                      ? sensor.average_temperature
-                      : sensor.average_moisture;
-                    const depth = dataOption === 'Temperature'
-                      ? DEPTH_TEMPERATURE_CM
-                      : DEPTH_MOISTURE_CM;
-                    const valueAtDepth = avg?.[depth] ?? null;
-                    clr = valueAtDepth != null ? getColor(valueAtDepth) : defaultColour;
-                    popupExtra = (
-                      <>
-                        <br /><br />
-                        {Object.entries(avg || {}).map(([d, v]) => (
-                          <div key={d}>
-                            <strong>{d} cm</strong>: {v.toFixed(2)}
-                            {dataOption === 'Temperature' ? ' \u00b0C' : ' m\u00b3/m\u00b3'}
-                          </div>
-                        ))}
-                      </>
-                    );
+                  let popupContent;
+                  
+                  if (dataOption === 'Redox') {
+                    clr = FIXED_MARKER_COLOR.Redox;
+                    const value = sensor.redox?.[redoxDepth];
+                    popupContent = value != null 
+                      ? `${redoxDepth.charAt(0).toUpperCase() + redoxDepth.slice(1)}: ${value} mV`
+                      : 'No data';
+                  } else if (dataOption === 'Temperature') {
+                    const value = sensor.temperature;
+                    clr = value != null ? getColor(value) : defaultColour;
+                    popupContent = value != null 
+                      ? `${value.toFixed(1)} °C`
+                      : 'No data';
+                  } else if (dataOption === 'Moisture') {
+                    const value = sensor.moisture;
+                    clr = value != null ? getColor(value) : defaultColour;
+                    popupContent = value != null 
+                      ? `${(value * 100).toFixed(1)} %`
+                      : 'No data';
                   } else {
-                    clr = FIXED_MARKER_COLOR[dataOption] || defaultColour;
+                    clr = defaultColour;
+                    popupContent = 'No data';
                   }
 
                   return (
@@ -215,11 +199,11 @@ export function CatchmentLayers({
                       center={[lat, lon]}
                       pathOptions={{ color: clr, fillColor: clr, fillOpacity: 1 }}
                       radius={8}
-                      eventHandlers={{ click: () => onSensorClick(sensor.id) }}
                     >
-                      <Popup eventHandlers={{ remove: () => onSensorClose() }}>
+                      <Popup>
                         <strong>{sensor.name}</strong>
-                        {popupExtra}
+                        <br /><br />
+                        {popupContent}
                       </Popup>
                     </CircleMarker>
                   )

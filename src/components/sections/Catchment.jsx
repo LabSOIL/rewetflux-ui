@@ -3,9 +3,6 @@ import {
   Pane,
 } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
-import TimeseriesPlot from '../timeseries/TimeseriesPlot';
-import FluxPlot from '../timeseries/FluxPlot';
-import RedoxPlot from '../timeseries/RedoxPlot';
 import 'leaflet-geotiff';
 import 'leaflet/dist/leaflet.css'
 import { CatchmentLayers } from '../maps/Catchment';
@@ -17,17 +14,13 @@ export default function Catchment({
   selectedData,
   viewMode,
   selectArea,
-  handleSensorClick,
-  sensorSeries,
-  setSensorSeries,
   setShouldRecenter,
   shouldRecenter,
   sectionsRef,
   bounds,
   centroid,
   defaultColour,
-  onZoom,
-  sensorLoading,
+  redoxDepth,
 }) {
     return (
     <>
@@ -53,36 +46,14 @@ export default function Catchment({
                 activeAreaId={activeAreaId}
                 dataOption={selectedData}
                 onAreaClick={selectArea}
-                onSensorClick={handleSensorClick}
-                onSensorClose={() => setSensorSeries(null)}
                 recenterSignal={shouldRecenter}
                 onRecenterHandled={() => setShouldRecenter(false)}
                 bounds={bounds}
                 centroid={centroid}
                 defaultColour={defaultColour}
+                redoxDepth={redoxDepth}
               />
             </MapContainer>
-            {sensorSeries && (selectedData === 'Temperature' || selectedData === 'Moisture') && (
-              <div className="overlay-chart">
-                <TimeseriesPlot
-                  series={sensorSeries}
-                  dataOption={selectedData}
-                  onZoom={onZoom}
-                  loading={sensorLoading}
-                  resolution={sensorSeries.resolution}
-                />
-              </div>
-            )}
-            {sensorSeries && selectedData === 'GasFlux' && (
-              <div className="overlay-chart">
-                <FluxPlot series={sensorSeries} loading={sensorLoading} />
-              </div>
-            )}
-            {sensorSeries && selectedData === 'Redox' && (
-              <div className="overlay-chart">
-                <RedoxPlot series={sensorSeries} loading={sensorLoading} />
-              </div>
-            )}
           </div>
         </section>
         </>

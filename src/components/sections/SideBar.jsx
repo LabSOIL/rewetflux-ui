@@ -6,7 +6,6 @@ import 'leaflet-geotiff';
 import 'leaflet/dist/leaflet.css';
 
 const dataOptions = [
-  { key: 'GasFlux', color: '#d62728', label: 'Gas Flux' },
   { key: 'Redox', color: '#2ca02c', label: 'Redox' },
   { key: 'Temperature', color: '#ff7f00', label: 'Temperature' },
   { key: 'Moisture', color: '#1f77b4', label: 'Moisture' },
@@ -23,6 +22,8 @@ export default function SideBar({
   clearArea,
   selectData,
   setViewMode,
+  redoxDepth,
+  setRedoxDepth,
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('cover');
@@ -233,6 +234,24 @@ export default function SideBar({
                       </li>
                     ))}
                   </ul>
+
+                  {selectedData === 'Redox' && (
+                    <div className="redox-depth-toggle">
+                      <button
+                        className={`depth-btn ${redoxDepth === 'top' ? 'active' : ''}`}
+                        onClick={() => setRedoxDepth('top')}
+                      >
+                        Top
+                      </button>
+                      <button
+                        className={`depth-btn ${redoxDepth === 'bottom' ? 'active' : ''}`}
+                        onClick={() => setRedoxDepth('bottom')}
+                      >
+                        Bottom
+                      </button>
+                    </div>
+                  )}
+
                   <hr
                     style={{
                       width: '90%',
