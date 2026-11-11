@@ -1,72 +1,37 @@
-import { useEffect } from 'react';
-import { useMap } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import { useState } from 'react';
 
+const STEPS = 10;
 
-export default function Legend({ dataOption, title, colorScale, minVal, maxVal }) {
+/** A colour scale with its title and its minimum, middle and maximum, which folds away behind a toggle. */
+export default function Legend({ title, colorScale, minVal, maxVal }) {
+  const [isVisible, setIsVisible] = useState(true);
+  const mid = Math.round((minVal + maxVal) / 2);
+  const labels = [maxVal, mid === minVal || mid === maxVal ? '' : mid, minVal];
+  const stops = colorScale.colors(STEPS).reverse().join(', ');
 
-  const map = useMap();
-
-  useEffect(() => {
-    document.querySelectorAll('.info.legend').forEach(el => el.remove());
-    if (!dataOption) return;
-
-    const legend = L.control({ position: 'bottomright' });
-
-    legend.onAdd = () => {
-      const container = L.DomUtil.create('div', 'info legend');
-      Object.assign(container.style, {
-        display: 'block',
-        textAlign: 'left',
-        padding: '0.5em',
-        maxHeight: '12rem',
-        overflowY: 'auto',
-        font: '14px/16px Arial, Helvetica, sans-serif',
-        background: 'rgba(255,255,255,0.9)',
-        color: '#333',
-        borderRadius: '5px',
-        boxShadow: '0 0 15px rgba(0,0,0,0.2)',
-      });
-
-      const midVal = Math.round((minVal + maxVal) / 2);
-      const STEPS = 10;
-      const samples = colorScale.colors(STEPS);
-      const stops = samples
-        .map((c, i) => `${c} ${Math.round((i / (STEPS - 1)) * 100)}%`)
-        .join(', ');
-
-      container.innerHTML = `
-        <h4 style="margin:0 0 .5em; padding:0; text-align:center; white-space:normal">
-          ${title}
-        </h4>
-        <div style="display:flex; align-items:center">
-          <div style="
-            background: linear-gradient(to top, ${stops});
-            width:1rem;
-            height:6rem;
-            margin-right:0.5rem;
-          "></div>
-          <div style="
-            display:flex;
-            flex-direction:column;
-            justify-content:space-between;
-            height:6rem;
-            text-align:left;
-          ">
-            <span>${maxVal}</span>
-            <span>${midVal === minVal || midVal === maxVal ? '' : midVal}</span>
-            <span>${minVal}</span>
+  return (
+    <div className={`legend-container${isVisible ? '' : ' legend-collapsed'}`}>
+      <button
+        type="button"
+        className="toggle-button"
+        aria-label={isVisible ? 'Hide legend' : 'Show legend'}
+        onClick={() => setIsVisible(!isVisible)}
+      >
+        {isVisible ? '▾' : '▴'}
+      </button>
+      {isVisible && (
+        <div className="legend-content">
+          <div className="legend-title">{title}</div>
+          <div className="legend-color-bar-container">
+            <div className="legend-color-bar" style={{ background: `linear-gradient(to bottom, ${stops})` }} />
+            <div className="legend-labels">
+              {labels.map((value, index) => (
+                <div key={index} className="legend-label">{value}</div>
+              ))}
+            </div>
           </div>
         </div>
-      `;
-
-      return container;
-    };
-
-    legend.addTo(map);
-    return () => map.removeControl(legend);
-  }, [map, dataOption, title, colorScale, minVal, maxVal]);
-
-  return null;
+      )}
+    </div>
+  );
 }

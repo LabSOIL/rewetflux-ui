@@ -1,0 +1,350 @@
+.button-group button {
+    font-family: 'Arial', 'Helvetica', sans-serif;
+}
+
+.side-panel {
+    width: var(--rail-width);
+    padding: 0;
+    background: var(--rail);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    height: 100vh;
+    border-right: 1px solid var(--panel-border);
+    justify-content: space-between;
+    z-index: 1100;
+    /* Above the Leaflet control panes (z-index 1000), so the rail and its popups draw over the scale bar and the date bar */
+    overflow: visible;
+}
+
+
+.button-group {
+    width: 100%;
+}
+
+
+.button-group.bottom {
+    margin-top: auto;
+}
+
+.button-group button {
+    width: 100%;
+    height: 70px;
+    background-color: var(--button);
+    color: var(--text);
+    border: none;
+    border-bottom: 1px solid var(--panel-border);
+    cursor: pointer;
+    transition: background-color 0.3s;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 12px;
+    padding: 4px;
+    box-sizing: border-box;
+}
+
+.button-group button:last-child {
+    border-bottom: none;
+}
+
+.button-group button:hover,
+.button-group button.active {
+    background-color: var(--active);
+    color: var(--text-strong);
+}
+
+.button-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    width: 100%;
+    height: 100%;
+    justify-content: center;
+}
+
+.button-content span {
+    display: block;
+}
+
+.current-selection {
+    font-size: 10px;
+    margin-top: 2px;
+    color: var(--accent-text);
+    height: 14px;
+}
+
+
+.side-panel .chips-list .MuiChip-root {
+    background-color: var(--button);
+    color: var(--text);
+    border: 1px solid var(--button);
+    margin: 4px;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+.side-panel .chips-list .MuiChip-root.active {
+    background-color: var(--active);
+    color: var(--accent-text);
+    border: 1px solid var(--active);
+}
+
+.side-panel .chips-list .MuiChip-root.disabled {
+    background-color: var(--disabled);
+    color: var(--text);
+    border: 1px solid var(--disabled);
+    opacity: 0.5;
+}
+
+.button-group .disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.arrow-note {
+    position: absolute;
+    right: -120px;
+    width: 120px;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    font-size: 12px;
+    color: var(--text);
+    text-align: left;
+    white-space: nowrap;
+    z-index: 1001;
+}
+
+.arrow-note::before {
+    content: '';
+    border: solid transparent;
+    border-width: 10px;
+    border-right-color: var(--text);
+    margin-right: 10px;
+}
+
+/* Ensure pop-up panels appear above the tooltip */
+.popup {
+    position: absolute;
+    left: calc(var(--rail-width) + 10px);
+    top: 10px;
+    width: 400px;
+    background: var(--panel);
+    color: var(--text);
+    box-shadow: 2px 2px 10px var(--shadow);
+    padding: 15px;
+    z-index: 1100;
+    /* Higher than tooltip's z-index */
+    border-radius: 5px;
+}
+
+/* Above the date bar: the bar's top is 101px up from the bottom of the window */
+.popup.popup-bottom {
+    top: auto;
+    bottom: 115px;
+}
+
+/* Above the scale bar, when the date bar is not showing */
+.popup.popup-bottom-no-timeline {
+    top: auto;
+    bottom: 45px;
+}
+
+.popup h3 {
+    margin-top: 0;
+    color: var(--muted);
+}
+
+.popup h5 {
+    margin-top: 0.6rem;
+    margin-bottom: 0.4rem;
+}
+
+.popup p {
+    margin: 0;
+    color: var(--muted);
+}
+
+.popup label {
+    color: var(--text);
+}
+
+/* Adjusting the gap and divider for a thinner split */
+.button-group.top .variable-buttons {
+    margin-top: 10px;
+    /* Reduced gap between sections */
+}
+
+/* Thinner divider line */
+.button-divider {
+    width: 60%;
+    height: 1px;
+    background-color: var(--variable);
+    margin: 10px auto;
+}
+
+/* Variable buttons with a slight color distinction */
+.button-group .variable-button {
+    background-color: var(--variable);
+}
+
+.button-group .variable-button:hover,
+.button-group .variable-button.active {
+    background-color: var(--variable-active);
+    color: var(--text-strong);
+}
+
+.popup.info-popup {
+    max-height: calc(100vh - 20px);
+    overflow-y: auto;
+    box-sizing: border-box;
+    text-align: left;
+}
+
+/* The panel keeps a 10px gap below the window top, so its height is the window less its anchor and that gap */
+.popup.info-popup.popup-bottom {
+    max-height: calc(100vh - 125px);
+}
+
+.popup.info-popup.popup-bottom-no-timeline {
+    max-height: calc(100vh - 55px);
+}
+
+/* The panels' type scale: the info text is 12px, as the rail labels and chips are */
+.popup.info-popup {
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.popup.info-popup p {
+    margin: 0 0 8px;
+}
+
+.popup.info-popup .info-heading {
+    margin: 16px 0 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+}
+
+.popup.info-popup a {
+    color: var(--link);
+}
+
+/* Under Variable: the depth gauge or the chamber buttons as a section like a rail button, sized to their content, on its own background; the rail below stays empty */
+.depth-slot {
+    flex: none;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-sizing: border-box;
+    background-color: var(--depth-section);
+    border-top: 1px solid var(--panel-border);
+    border-bottom: 1px solid var(--panel-border);
+    padding-bottom: 6px;
+}
+
+.slot-label {
+    padding: 10px 0 6px;
+    font-family: 'Arial', 'Helvetica', sans-serif;
+    font-size: 12px;
+    color: var(--text);
+    text-align: center;
+}
+
+/* The stops sit at a fixed pitch, so the column joins the centres of the surface tick and the last stop */
+.depth-gauge {
+    position: relative;
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    outline-offset: -2px;
+}
+
+/* A 20px row above the first stop; its tick is centred on the column at x = 25px */
+.depth-surface {
+    flex: none;
+    height: 20px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 6px 0 17px;
+    font-family: 'Arial', 'Helvetica', sans-serif;
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+}
+
+.depth-surface-tick {
+    flex: none;
+    width: 16px;
+    height: 2px;
+    background: var(--soil-surface);
+}
+
+.depth-line {
+    position: absolute;
+    left: 22px;
+    top: 10px;
+    bottom: 14px;
+    width: 6px;
+    border-radius: 3px;
+    background: linear-gradient(var(--soil-surface), var(--soil-depth));
+}
+
+.depth-stop {
+    position: relative;
+    flex: none;
+    height: 28px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 6px 0 17px;
+    background: none;
+    border: none;
+    color: var(--text);
+    font-family: 'Arial', 'Helvetica', sans-serif;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.depth-stop:hover {
+    color: var(--text-strong);
+}
+
+.depth-dot {
+    flex: none;
+    box-sizing: border-box;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid var(--text);
+    background: var(--depth-section);
+}
+
+.depth-stop.selected .depth-dot {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+.depth-stop.selected {
+    color: var(--accent-text);
+}
+
+.depth-label {
+    white-space: nowrap;
+}
+
+.setting-buttons {
+    flex: none;
+    overflow: hidden;
+}
+
+.setting-buttons button:last-child {
+    border-bottom: none;
+}

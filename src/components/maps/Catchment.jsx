@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useMemo, useLayoutEffect } from 'react';
 import {
   Popup,
   Polygon,
@@ -8,16 +8,23 @@ import {
 } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { BaseLayers } from './Layers';
+import MapCard from './MapCard';
 import chroma from 'chroma-js';
-import Legend from './Legend';
-import 'leaflet-geotiff';
 import 'leaflet/dist/leaflet.css';
 import { colormap, getColorScale, getPalette } from '../../utils/colourMap';
+import { getLatestAt } from '../../data';
+import { theme } from '../../theme';
+import { flyToClearOfPanels } from './siteOpeningView';
 
 const PROFILE_TYPE_FOR_DATA = {
   Temperature: 'chamber',
   Moisture: 'chamber',
+  Redox: 'redox',
+};
+
+const VARIABLE_FOR_DATA = {
+  Temperature: 'temperature',
+  Moisture: 'moisture',
   Redox: 'redox',
 };
 
@@ -28,16 +35,14 @@ export function CatchmentLayers({
   onAreaClick,
   recenterSignal,
   onRecenterHandled,
-  bounds,
   centroid,
   defaultColour,
-  redoxDepth,
+  depth,
   redoxMin,
   redoxMax,
 }) {
   const map = useMap();
   const [hasZoomed, setHasZoomed] = useState(false);
-  const prevAreasLengthRef = useRef(0);
 
   const allAreaBounds = (areaList) => {
     const coords = areaList
@@ -47,40 +52,27 @@ export function CatchmentLayers({
   };
 
   useEffect(() => {
-    if (!areas.length || prevAreasLengthRef.current > 0 || activeAreaId) return;
-    prevAreasLengthRef.current = areas.length;
-    const fitAll = () => {
-      const b = allAreaBounds(areas);
-      if (b) map.fitBounds(b);
-    };
-    map._loaded ? fitAll() : map.once('load', fitAll);
-  }, [areas]);
-
-  useEffect(() => {
     if (!areas.length || !recenterSignal) return;
     setHasZoomed(false);
 
     const doFly = () => {
+      // Registered before the fly: Leaflet emits moveend synchronously when it does not animate.
+      map.once('moveend', () => {
+        setHasZoomed(true);
+        onRecenterHandled();
+      });
       if (activeAreaId) {
         const coords = areas
           .find(a => a.id === activeAreaId)
           ?.geom.coordinates.flatMap(ring => ring.map(([lng, lat]) => [lat, lng]));
-        map.flyToBounds(L.latLngBounds(coords).pad(0.2), { duration: 1 });
-        map.once('moveend', () => {
-          setHasZoomed(true);
-          onRecenterHandled();
-        });
+        flyToClearOfPanels(map, L.latLngBounds(coords));
       } else {
         const b = allAreaBounds(areas);
         if (b) {
-          map.flyToBounds(b, { duration: 1 });
+          flyToClearOfPanels(map, b);
         } else {
           map.flyTo(centroid, 13, { duration: 1 });
         }
-        map.once('moveend', () => {
-          setHasZoomed(true);
-          onRecenterHandled();
-        });
       }
     };
 
@@ -94,11 +86,8 @@ export function CatchmentLayers({
         : areas.flatMap(a => a.sensors)
       )
         .filter(s => s.profile_type === PROFILE_TYPE_FOR_DATA[dataOption])
-        .map(s => {
-          const val = dataOption === 'Temperature' ? s.temperature : s.moisture;
-          return typeof val === 'number' ? val : null;
-        })
-        .filter(v => v != null);
+        .map(s => getLatestAt(s.id, VARIABLE_FOR_DATA[dataOption], depth))
+        .filter(v => typeof v === 'number');
 
       if (sensorVals.length) {
         return {
@@ -114,7 +103,7 @@ export function CatchmentLayers({
     }
 
     return { minVal: 0, maxVal: 1 };
-  }, [areas, activeAreaId, dataOption, redoxMin, redoxMax]);
+  }, [areas, activeAreaId, dataOption, depth, redoxMin, redoxMax]);
 
   const legendTitles = {
     Temperature: 'Temperature [°C]',
@@ -140,7 +129,11 @@ export function CatchmentLayers({
 
   return (
     <>
-      <BaseLayers />
+      <MapCard
+        legend={dataOption === 'Temperature' || dataOption === 'Moisture' || dataOption === 'Redox'
+          ? { title: legendTitles[dataOption] || dataOption, colorScale, minVal, maxVal }
+          : null}
+      />
 
       {areas.map(area => {
         if (!area.geom?.coordinates) return null;
@@ -155,7 +148,7 @@ export function CatchmentLayers({
               positions={positions}
               pathOptions={{
                 fillOpacity: 0.25,
-                color: isActive ? '#2b8cbe' : defaultColour,
+                color: isActive ? theme.selectedArea : defaultColour,
               }}
               eventHandlers={{
                 add: e => e.target.bringToBack(),
@@ -183,33 +176,19 @@ export function CatchmentLayers({
                   let popupContent;
 
                   if (dataOption === 'Redox') {
-                    const topVal = sensor.redox?.top;
-                    const bottomVal = sensor.redox?.bottom;
-                    const activeVal = redoxDepth === 'top' ? topVal : bottomVal;
-                    
-                    clr = activeVal != null ? getColor(activeVal) : defaultColour;
-                    
-                    const topDisplay = topVal != null ? topVal.toFixed(1) : 'N/A';
-                    const bottomDisplay = bottomVal != null ? bottomVal.toFixed(1) : 'N/A';
-                    
-                    popupContent = (
-                      <>
-                        <div style={{ fontWeight: redoxDepth === 'top' ? 'bold' : 'normal' }}>
-                          Top: {topDisplay} mV
-                        </div>
-                        <div style={{ fontWeight: redoxDepth === 'bottom' ? 'bold' : 'normal' }}>
-                          Bottom: {bottomDisplay} mV
-                        </div>
-                      </>
-                    );
+                    const value = getLatestAt(sensor.id, 'redox', depth);
+                    clr = value != null ? getColor(value) : defaultColour;
+                    popupContent = value != null
+                      ? `${value.toFixed(1)} mV at ${depth} cm`
+                      : 'No data';
                   } else if (dataOption === 'Temperature') {
-                    const value = sensor.temperature;
+                    const value = getLatestAt(sensor.id, 'temperature', depth);
                     clr = value != null ? getColor(value) : defaultColour;
                     popupContent = value != null
                       ? `${value.toFixed(1)} °C`
                       : 'No data';
                   } else if (dataOption === 'Moisture') {
-                    const value = sensor.moisture;
+                    const value = getLatestAt(sensor.id, 'moisture', depth);
                     clr = value != null ? getColor(value) : defaultColour;
                     popupContent = value != null
                       ? `${(value * 100).toFixed(1)} %`
@@ -235,16 +214,6 @@ export function CatchmentLayers({
                   );
                 })
             }
-
-            {(dataOption === 'Temperature' || dataOption === 'Moisture' || dataOption === 'Redox') && (
-              <Legend
-                dataOption={dataOption}
-                title={legendTitles[dataOption] || dataOption}
-                colorScale={colorScale}
-                minVal={minVal}
-                maxVal={maxVal}
-              />
-            )}
           </React.Fragment>
         );
       })}

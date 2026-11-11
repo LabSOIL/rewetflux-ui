@@ -2,6 +2,7 @@ import proj4 from 'proj4';
 import React, { useState, useEffect } from 'react';
 import { useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
+import { theme } from '../../theme';
 
 // 1. Register Swiss LV95 / EPSG:2056 in proj4
 proj4.defs(
@@ -79,7 +80,7 @@ export default function IdentifyControl({
             <hr style="margin:0.5em 0"/>
             <div><strong>Français:</strong> ${titleFr}</div>
             <div>${descFr}</div>
-            <div style="margin-top:0.75em; font-size:0.8rem; color:#555">
+            <div style="margin-top:0.75em; font-size:0.8rem; color:${theme.mutedOnLight}">
               <em>Source:
                 <a href="https://www.swisstopo.admin.ch/en/geological-model-2d-geocover"
                    target="_blank"

@@ -1,0 +1,150 @@
+.map-view {
+    position: relative;
+}
+
+.leaflet-control-attribution {
+    background-color: var(--panel) !important;
+    color: var(--text);
+    border: none;
+}
+
+.leaflet-control-attribution a {
+    color: var(--accent-text) !important;
+}
+
+.leaflet-control-scale-line {
+    background-color: var(--panel);
+    color: var(--accent-text);
+    text-shadow: none;
+}
+
+.leaflet-control-zoom a {
+    background-color: var(--panel) !important;
+    color: var(--text) !important;
+    border: none !important;
+    height: 36px !important;
+    line-height: 40px !important;
+}
+
+/* One card for the basemap chooser and the legend: its width is set by the wider of the two. */
+.map-card {
+    box-sizing: border-box;
+    width: max-content;
+    min-width: 140px;
+    max-width: 250px;
+    background: var(--panel);
+    color: var(--text);
+    border-radius: 5px;
+    box-shadow: 2px 2px 10px var(--shadow);
+    padding: 10px;
+}
+
+.map-card label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+.map-card input[type='radio'],
+.map-card input[type='checkbox'] {
+    accent-color: var(--accent);
+    margin: 0;
+}
+
+.map-card-overlays {
+    margin-top: 4px;
+}
+
+.map-card-separator {
+    border: none;
+    border-top: 1px solid var(--panel-border);
+    margin: 10px 0;
+}
+
+.legend-container {
+    position: relative;
+}
+
+.legend-container.legend-collapsed {
+    min-height: 20px;
+}
+
+.legend-container .toggle-button {
+    position: absolute;
+    top: 0;
+    right: 0;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    background: transparent;
+    color: var(--accent-text);
+    padding: 0;
+}
+
+.legend-title {
+    color: var(--text);
+    font-weight: bold;
+    margin: 0 18px 10px 0;
+    text-align: left;
+}
+
+.legend-color-bar-container {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+}
+
+.legend-color-bar {
+    width: 20px;
+    height: 200px;
+    flex-shrink: 0;
+    border-radius: 5px;
+    margin-right: 10px;
+}
+
+.legend-labels {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-start;
+    height: 200px;
+}
+
+.legend-label {
+    color: var(--white);
+    font-size: 11px;
+}
+
+/* The funders' logos: above the date bar (its top is 101px up) and clear of the zoom control on the right */
+.map-logos {
+    position: absolute;
+    right: 50px;
+    bottom: 115px;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 6px 10px;
+    background: var(--logo-background);
+    border-radius: 5px;
+    box-shadow: 2px 2px 10px var(--shadow);
+    opacity: 0.55;
+    transition: opacity 0.25s ease;
+}
+
+.map-logos:hover {
+    opacity: 1;
+}
+
+.map-logos a {
+    display: block;
+    line-height: 0;
+}
+
+/* Every logo at one height; the width follows each logo's own shape, so an SVG with only a viewBox gets a size */
+.map-logos img {
+    height: 40px;
+    width: auto;
+    display: block;
+}

@@ -1,31 +1,58 @@
-import { LayersControl, TileLayer } from 'react-leaflet';
+import { TileLayer } from 'react-leaflet';
+import { BASEMAP_LAYERS, DEFAULT_BASEMAP_ID, tileOptions } from './basemap';
 
+export { DEFAULT_BASEMAP_ID };
 
-export const BaseLayers = () => {
-    const { BaseLayer, Overlay } = LayersControl;
-    return (
-        <LayersControl collapsed={false}>
-            <BaseLayer checked name="Topo">
+const BASES = BASEMAP_LAYERS.filter(layer => layer.kind !== 'overlay');
+const OVERLAYS = BASEMAP_LAYERS.filter(layer => layer.kind === 'overlay');
+
+// Overlays draw over whichever base is chosen, whatever order the layers were added in.
+const zIndexOf = layer => (layer.kind === 'overlay' ? 2 : 1);
+
+/** The tile layers of the chosen base and of the switched-on overlays. */
+export const BaseLayers = ({ baseId, overlayIds }) => (
+    <>
+        {BASEMAP_LAYERS
+            .filter(layer => (layer.kind === 'overlay' ? overlayIds.includes(layer.id) : layer.id === baseId))
+            .map(layer => (
                 <TileLayer
-                    attribution='&copy; <a href="https://www.swisstopo.admin.ch/">swisstopo</a>'
-                    url="https://wmts20.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/default/current/3857/{z}/{x}/{y}.jpeg"
-                    opacity={0.5}
+                    key={layer.id}
+                    {...tileOptions(layer)}
+                    zIndex={zIndexOf(layer)}
                 />
-            </BaseLayer>
-            <BaseLayer name="Aerial">
-                <TileLayer
-                    attribution='&copy; <a href="https://www.swisstopo.admin.ch/">swisstopo</a>'
-                    url="https://wmts20.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/{z}/{x}/{y}.jpeg"
-                    opacity={0.5}
-                />
-            </BaseLayer>
-            <Overlay name="LiDAR / Relief">
-                <TileLayer
-                    attribution='&copy; <a href="https://www.swisstopo.admin.ch/">swisstopo swissALTI3D</a>'
-                    url="https://wmts20.geo.admin.ch/1.0.0/ch.swisstopo.swissalti3d-reliefschattierung/default/current/3857/{z}/{x}/{y}.png"
-                    opacity={0.5}
-                />
-            </Overlay>
-        </LayersControl>
-    );
-};
+            ))}
+    </>
+);
+
+/** The radio buttons for the bases and the checkboxes for the overlays. */
+export const BaseChooser = ({ baseId, overlayIds, onBase, onOverlay }) => (
+    <div className="map-card-layers">
+        <div className="map-card-base">
+            {BASES.map(layer => (
+                <label key={layer.id}>
+                    <input
+                        type="radio"
+                        name="basemap"
+                        checked={layer.id === baseId}
+                        onChange={() => onBase(layer.id)}
+                    />
+                    <span>{layer.name}</span>
+                </label>
+            ))}
+        </div>
+        {OVERLAYS.length > 0 && (
+            <div className="map-card-overlays">
+                {OVERLAYS.map(layer => (
+                    <label key={layer.id}>
+                        <input
+                            type="checkbox"
+                            checked={overlayIds.includes(layer.id)}
+                            onChange={event => onOverlay(layer.id, event.target.checked)}
+                        />
+                        <span>{layer.name}</span>
+                    </label>
+                ))}
+            </div>
+        )}
+    </div>
+);

@@ -1,11 +1,9 @@
 import React, { useRef, useEffect, useMemo } from 'react';
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
+import { theme } from '../../theme';
 
-const COLORS = [
-  '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
-  '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf',
-];
+const COLORS = theme.chart.series;
 
 function toAlignedData(data) {
   if (!data.times || !data.times.length || !data.parameters || !data.parameters.length) {
@@ -54,8 +52,8 @@ function tooltipPlugin(tooltipRef, containerRef) {
 const TOOLTIP_STYLE = {
   position: 'absolute',
   display: 'none',
-  background: 'rgba(0,0,0,0.85)',
-  color: '#fff',
+  background: theme.chart.tooltipBackground,
+  color: theme.chart.tooltipText,
   padding: '8px 12px',
   borderRadius: '4px',
   fontSize: '12px',
@@ -63,7 +61,7 @@ const TOOLTIP_STYLE = {
   pointerEvents: 'none',
   zIndex: '100',
   lineHeight: '1.5',
-  boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+  boxShadow: theme.chart.tooltipShadow,
 };
 
 export default function TimeseriesPlot({ series, dataOption, onZoom, loading, resolution }) {
@@ -122,7 +120,7 @@ export default function TimeseriesPlot({ series, dataOption, onZoom, loading, re
         drag: { x: true, y: false },
         points: {
           fill: (u, si) => u.series[si].stroke(u, si),
-          stroke: (u, si) => '#fff',
+          stroke: (u, si) => theme.chart.pointFill,
           size: (u, si) => 7,
           width: (u, si, size) => 2,
         },
@@ -139,12 +137,12 @@ export default function TimeseriesPlot({ series, dataOption, onZoom, loading, re
         })),
       ],
       axes: [
-        { stroke: '#333', grid: { stroke: 'rgba(0,0,0,0.1)' } },
+        { stroke: theme.chart.axis, grid: { stroke: theme.chart.grid } },
         {
           label: dataOption === 'Temperature' ? 'Temperature (\u00B0C)' : 'VWC (m\u00B3/m\u00B3)',
           size: 60,
-          stroke: '#333',
-          grid: { stroke: 'rgba(0,0,0,0.1)' },
+          stroke: theme.chart.axis,
+          grid: { stroke: theme.chart.grid },
         },
       ],
       legend: {
@@ -213,9 +211,9 @@ export default function TimeseriesPlot({ series, dataOption, onZoom, loading, re
         <div style={{
           position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(255,255,255,0.6)', zIndex: 10, pointerEvents: 'none',
+          background: theme.chart.loadingVeil, zIndex: 10, pointerEvents: 'none',
         }}>
-          <span style={{ color: '#999', fontSize: 12 }}>Loading...</span>
+          <span style={{ color: theme.chart.loadingText, fontSize: 12 }}>Loading...</span>
         </div>
       )}
     </div>

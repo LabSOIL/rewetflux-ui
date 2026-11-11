@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import FrontendApp from './App';
 import './index.css';
+import { applyTheme } from './theme';
 import { RouterProvider, Routes, Route, createBrowserRouter } from 'react-router-dom';
 
 export const App = () => {
@@ -20,6 +21,8 @@ export const App = () => {
     return <RouterProvider router={router} />;
 };
 
+
+applyTheme();
 
 createRoot(document.getElementById('root')).render(
     <StrictMode>

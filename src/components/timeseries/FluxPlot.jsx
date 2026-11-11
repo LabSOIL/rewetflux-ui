@@ -1,14 +1,15 @@
 import { useRef, useEffect } from 'react';
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
+import { theme } from '../../theme';
 
-const CO2_COLOR = '#d62728';
-const CH4_COLOR = '#2ca02c';
+const CO2_COLOR = theme.chart.co2;
+const CH4_COLOR = theme.chart.ch4;
 
 const LOADING_OVERLAY = {
   position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
   display: 'flex', alignItems: 'center', justifyContent: 'center',
-  background: 'rgba(255,255,255,0.6)', zIndex: 10, pointerEvents: 'none',
+  background: theme.chart.loadingVeil, zIndex: 10, pointerEvents: 'none',
 };
 
 function buildAligned(flux_data) {
@@ -72,14 +73,14 @@ export default function FluxPlot({ series, loading }) {
           },
         ],
         axes: [
-          { stroke: '#333', grid: { stroke: 'rgba(0,0,0,0.1)' } },
+          { stroke: theme.chart.axis, grid: { stroke: theme.chart.grid } },
           {
             scale: 'co2',
             label: 'CO\u2082 (\u03bcmol m\u207b\u00b2 s\u207b\u00b9)',
             side: 3,
             size: 75,
             stroke: CO2_COLOR,
-            grid: { stroke: 'rgba(0,0,0,0.1)' },
+            grid: { stroke: theme.chart.grid },
           },
           {
             scale: 'ch4',
@@ -124,7 +125,7 @@ export default function FluxPlot({ series, loading }) {
       <div ref={containerRef} />
       {loading && (
         <div style={LOADING_OVERLAY}>
-          <span style={{ color: '#999', fontSize: 12 }}>Loading...</span>
+          <span style={{ color: theme.chart.loadingText, fontSize: 12 }}>Loading...</span>
         </div>
       )}
     </div>

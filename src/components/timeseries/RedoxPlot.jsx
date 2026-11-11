@@ -1,15 +1,16 @@
 import { useRef, useEffect } from 'react';
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
+import { theme } from '../../theme';
 
-const DEPTH_COLORS = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728'];
+const DEPTH_COLORS = theme.chart.series.slice(0, 4);
 const DEPTH_LABELS = ['5 cm', '15 cm', '25 cm', '35 cm'];
 const DEPTH_KEYS = ['ch1_5cm_mv', 'ch2_15cm_mv', 'ch3_25cm_mv', 'ch4_35cm_mv'];
 
 const LOADING_OVERLAY = {
   position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
   display: 'flex', alignItems: 'center', justifyContent: 'center',
-  background: 'rgba(255,255,255,0.6)', zIndex: 10, pointerEvents: 'none',
+  background: theme.chart.loadingVeil, zIndex: 10, pointerEvents: 'none',
 };
 
 function buildAligned(redox_data) {
@@ -63,12 +64,12 @@ export default function RedoxPlot({ series, loading }) {
           })),
         ],
         axes: [
-          { stroke: '#333', grid: { stroke: 'rgba(0,0,0,0.1)' } },
+          { stroke: theme.chart.axis, grid: { stroke: theme.chart.grid } },
           {
             label: 'E\u2095 (mV)',
             size: 60,
-            stroke: '#333',
-            grid: { stroke: 'rgba(0,0,0,0.1)' },
+            stroke: theme.chart.axis,
+            grid: { stroke: theme.chart.grid },
           },
         ],
         legend: {
@@ -105,7 +106,7 @@ export default function RedoxPlot({ series, loading }) {
       <div ref={containerRef} />
       {loading && (
         <div style={LOADING_OVERLAY}>
-          <span style={{ color: '#999', fontSize: 12 }}>Loading...</span>
+          <span style={{ color: theme.chart.loadingText, fontSize: 12 }}>Loading...</span>
         </div>
       )}
     </div>

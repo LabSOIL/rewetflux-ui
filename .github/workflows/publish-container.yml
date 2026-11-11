@@ -7,6 +7,7 @@ on:
   push:
     branches:
       - main
+      - map-layout
     # Publish semver tags as releases.
     tags: [ '*.*.*' ]
 
@@ -97,7 +98,7 @@ jobs:
       #   push to main: update dev deployment
       #   push a tag: update stage, trigger prod merge req.
       - name: Deploy application to dev
-        if: ${{ github.ref }} == "refs/heads/main"
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/map-layout'
         run: |
           curl -X POST \
           -H "Authorization: Bearer ${{ secrets.CD_TOKEN }}" \
