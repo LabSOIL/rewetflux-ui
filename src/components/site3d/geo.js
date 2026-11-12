@@ -67,6 +67,12 @@ export function ringCentre(ring) {
 }
 
 /**
+ * The direction in degrees, anticlockwise from east, of a cut line across the line of sight of a
+ * camera at `azimuth` (radians, 0 looking north): its left normal points the way the camera looks.
+ */
+export const viewCutAngle = azimuth => ((((azimuth * 180) / Math.PI) % 360) + 360) % 360;
+
+/**
  * The cut line through `centre` at `angle` degrees anticlockwise from east, moved `offset` metres
  * along its left normal and clipped to the box of half-extents `halfWidth` and `halfHeight`.
  * Returns `{ from, to, normal }`, or null when the line misses the box.

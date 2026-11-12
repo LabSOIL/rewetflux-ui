@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cutLine, densifyRing, insideRing, localFrame, ringCentre } from './geo';
+import { cutLine, densifyRing, insideRing, localFrame, ringCentre, viewCutAngle } from './geo';
 import { terrainModel } from './terrain';
 
 describe('localFrame', () => {
@@ -64,6 +64,16 @@ describe('cutLine', () => {
     expect(line.from[0]).toBeCloseTo(-30);
     expect(line.from[1]).toBeCloseTo(-30);
     expect(line.to[0]).toBeCloseTo(30);
+  });
+
+  it('runs across the line of sight at the camera heading, its normal pointing the way the camera looks', () => {
+    for (const azimuth of [0, Math.PI / 2, 2.5, -1]) {
+      // A camera at this azimuth looks along (-sin, cos) in east and north.
+      const line = cutLine([0, 0], viewCutAngle(azimuth), 0, 50, 50);
+      expect(line.normal[0]).toBeCloseTo(-Math.sin(azimuth));
+      expect(line.normal[1]).toBeCloseTo(Math.cos(azimuth));
+    }
+    expect(viewCutAngle(-Math.PI / 2)).toBeCloseTo(270);
   });
 
   it('is null when the line misses the box', () => {

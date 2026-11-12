@@ -21,7 +21,7 @@ import {
   readingRange,
   ringCoverage,
 } from './fields';
-import { cutLine, ringCentre } from './geo';
+import { cutLine, ringCentre, viewCutAngle } from './geo';
 import ProfilePanel from './ProfilePanel';
 import { SiteScene, ZOOM_STEP } from './scene';
 import { terrainModel } from './terrain';
@@ -41,6 +41,7 @@ const DEFAULT_BASEMAP_STRENGTH = 35;
 const NOISE_SHARE = 0.3;
 const NOISE_SEED = 7;
 const CUT_SAMPLES = 240;
+const CUT_TURN_MS = 100;
 const LANDSCAPE_SAMPLES = 400;
 const SHOW_MS = 120;
 const FADE_MS = 200;
@@ -209,6 +210,11 @@ export default function Site3D() {
   const [cutOn, setCutOn] = useState(false);
   const [cutOffset, setCutOffset] = useState(0);
   const [cutAngle, setCutAngle] = useState(90);
+  const [cutFollows, setCutFollows] = useState(true);
+  const [cutLayers, setCutLayers] = useState(false);
+  // The camera's heading as a cut direction in whole degrees, sent at most every CUT_TURN_MS while the view turns.
+  const [viewAngle, setViewAngle] = useState(0);
+  const angleSent = useRef({ at: 0, timer: null });
   const [hover, setHover] = useState(null);
 
   const campaign = model.campaigns.find(c => c.date === date) ?? model.campaigns[model.campaigns.length - 1];
@@ -217,7 +223,8 @@ export default function Site3D() {
   const samples = useMemo(() => {
     if (!cutOn) return null;
     const { halfWidth, halfHeight } = model.terrain.frame;
-    const line = cutLine(model.centre, cutAngle, cutOffset * model.reach, halfWidth, halfHeight);
+    const angle = cutFollows ? viewAngle : cutAngle;
+    const line = cutLine(model.centre, angle, cutOffset * model.reach, halfWidth, halfHeight);
     if (!line) return null;
     // The same line, run across the whole surroundings.
     const {
@@ -225,7 +232,7 @@ export default function Site3D() {
       halfWidth: aw,
       halfHeight: ah,
     } = model.landscape;
-    const long = cutLine([model.centre[0] - oe, model.centre[1] - on], cutAngle, cutOffset * model.reach, aw, ah);
+    const long = cutLine([model.centre[0] - oe, model.centre[1] - on], angle, cutOffset * model.reach, aw, ah);
     return {
       line,
       landscape:
@@ -247,7 +254,7 @@ export default function Site3D() {
         ring: model.ring,
       }),
     };
-  }, [cutOn, cutAngle, cutOffset, model, rasters]);
+  }, [cutOn, cutAngle, cutFollows, viewAngle, cutOffset, model, rasters]);
 
   // The slices are redox, so the rail switches to it once, as the view opens.
   const entered = useRef(false);
@@ -259,8 +266,17 @@ export default function Site3D() {
 
   const needle = useRef(null);
   useEffect(() => {
+    const sent = angleSent.current;
+    const sendAngle = angle => {
+      sent.at = performance.now();
+      setViewAngle(Math.round(angle) % 360);
+    };
     const onCompass = (azimuth, polar) => {
       if (needle.current) needle.current.style.transform = `rotateX(${polar}rad) rotateZ(${azimuth}rad)`;
+      const angle = viewCutAngle(azimuth);
+      clearTimeout(sent.timer);
+      if (performance.now() - sent.at > CUT_TURN_MS) sendAngle(angle);
+      else sent.timer = setTimeout(() => sendAngle(angle), CUT_TURN_MS);
     };
     // The distance at which the scene shows the ground at the map's scale at the flat zoom.
     const lat = model.terrain.frame.toLonLat(...model.centre)[1];
@@ -277,7 +293,10 @@ export default function Site3D() {
     });
     site.show(site.topDownView(start.current.centre, start.current.height));
     scene.current = site;
-    return () => site.dispose();
+    return () => {
+      clearTimeout(sent.timer);
+      site.dispose();
+    };
   }, [model, selectOption]);
 
   // The block's basemap and the coarse surroundings' first, then the sharper surroundings'.
@@ -327,9 +346,10 @@ export default function Site3D() {
         line: samples.line,
         samples: samples.points,
         landscape: samples.landscape,
+        layers: cutLayers,
       },
     );
-  }, [samples]);
+  }, [samples, cutLayers]);
 
   useEffect(() => {
     scene.current.chooseSpacing(spacing);
@@ -482,19 +502,31 @@ export default function Site3D() {
                 aria-label="Cut position"
                 sx={sliderSx}
               />
-              <div className="site3d-control-label">
-                <span>Direction</span>
-                <span className="site3d-control-value">{cutAngle}°</span>
-              </div>
-              <Slider
-                size="small"
-                min={0}
-                max={179}
-                value={cutAngle}
-                onChange={(_, value) => setCutAngle(value)}
-                aria-label="Cut direction"
-                sx={sliderSx}
-              />
+              <label className="site3d-check">
+                <input type="checkbox" checked={cutFollows} onChange={event => setCutFollows(event.target.checked)} />
+                <span>Follow the view</span>
+              </label>
+              {!cutFollows && (
+                <>
+                  <div className="site3d-control-label">
+                    <span>Direction</span>
+                    <span className="site3d-control-value">{cutAngle}°</span>
+                  </div>
+                  <Slider
+                    size="small"
+                    min={0}
+                    max={179}
+                    value={cutAngle}
+                    onChange={(_, value) => setCutAngle(value)}
+                    aria-label="Cut direction"
+                    sx={sliderSx}
+                  />
+                </>
+              )}
+              <label className="site3d-check">
+                <input type="checkbox" checked={cutLayers} onChange={event => setCutLayers(event.target.checked)} />
+                <span>Cut the layers too</span>
+              </label>
             </div>
           )}
           <hr className="map-card-separator" />

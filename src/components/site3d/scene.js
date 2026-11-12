@@ -185,7 +185,8 @@ export class SiteScene {
     this.cut = null;
     this.fields = [];
     this.pointer = null;
-    this.clippable = [];
+    // The materials the cross-section cuts: the basemap's always, the redox layers' only when asked.
+    this.clippable = { basemap: [], layers: [] };
     this.disposables = [];
 
     const width = container.clientWidth || 1;
@@ -254,9 +255,9 @@ export class SiteScene {
     this.renderer.setAnimationLoop(() => this.frame());
   }
 
-  track(material, clip = true) {
+  track(material, group = 'layers') {
     this.disposables.push(material);
-    if (clip) this.clippable.push(material);
+    this.clippable[group].push(material);
     return material;
   }
 
@@ -268,20 +269,20 @@ export class SiteScene {
 
     this.blockAround = new THREE.Mesh(
       this.geometry,
-      this.track(new THREE.MeshLambertMaterial({ color: theme.sceneBlank, alphaMap: this.outsideMask, alphaTest: 0.5 })),
+      this.track(new THREE.MeshLambertMaterial({ color: theme.sceneBlank, alphaMap: this.outsideMask, alphaTest: 0.5 }), 'basemap'),
     );
     this.surface = new THREE.Mesh(
       this.geometry,
-      this.track(new THREE.MeshLambertMaterial({ color: theme.sceneBlank, alphaMap: this.insideMask, alphaTest: 0.5 })),
+      this.track(new THREE.MeshLambertMaterial({ color: theme.sceneBlank, alphaMap: this.insideMask, alphaTest: 0.5 }), 'basemap'),
     );
     this.surface.userData.kind = 'ground';
     const wall = new THREE.Mesh(
       wallGeometry(this.edge, heightAt, GROUND_SLAB, () => SOIL.clone()),
-      this.track(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide })),
+      this.track(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), 'basemap'),
     );
     const outline = new THREE.Line(
       lineGeometry(this.edge.map(([e, n]) => [e, heightAt(e, n) + 0.2, -n])),
-      this.track(new THREE.LineBasicMaterial({ color: theme.white, transparent: true, opacity: 0.85 })),
+      this.track(new THREE.LineBasicMaterial({ color: theme.white, transparent: true, opacity: 0.85 }), 'basemap'),
     );
     this.groundParts = [this.surface, wall, outline];
     this.groundMaterials = [this.surface.material, wall.material];
@@ -295,7 +296,7 @@ export class SiteScene {
     this.holeMask = rowsTexture(maskPixels(coverage, true), grid.width, grid.height, false);
     this.around = new THREE.Mesh(
       groundGeometry(terrain),
-      this.track(new THREE.MeshLambertMaterial({ color: theme.sceneBlank, alphaMap: this.holeMask, alphaTest: 0.5 })),
+      this.track(new THREE.MeshLambertMaterial({ color: theme.sceneBlank, alphaMap: this.holeMask, alphaTest: 0.5 }), 'basemap'),
     );
     const [e, n] = this.terrain.frame.toLocal(...terrain.frame.toLonLat(0, 0));
     this.around.position.set(e, terrain.base - this.terrain.base - 1, -n);
@@ -329,7 +330,7 @@ export class SiteScene {
 
   buildPositions(positions) {
     const geometry = new THREE.SphereGeometry(1.1, 12, 8);
-    const material = this.track(new THREE.MeshLambertMaterial({ color: theme.white }));
+    const material = this.track(new THREE.MeshLambertMaterial({ color: theme.white }), 'basemap');
     this.dots = positions.map(({ name, x, y }) => {
       const dot = new THREE.Mesh(geometry, material);
       dot.position.set(x, this.terrain.heightAt(x, y) + 1.1, -y);
@@ -416,7 +417,7 @@ export class SiteScene {
       const beads = DEPTHS.map((depth, k) => {
         const value = probe.values[k];
         const material = new THREE.MeshLambertMaterial({ color: channels(Number.isFinite(value) && this.colour(value)) });
-        material.clippingPlanes = this.cut ? [this.plane] : [];
+        material.clippingPlanes = this.cut?.layers ? [this.plane] : [];
         const bead = new THREE.Mesh(this.probeBead, material);
         bead.userData = { kind: 'probe', name: probe.name, depth, value };
         return bead;
@@ -522,10 +523,10 @@ export class SiteScene {
   }
 
   /**
-   * The cross-section: `{ line: { from, normal }, samples, landscape }`, the samples along the
-   * block from `crossSection` and the landscape's along the whole surroundings, or null for none.
-   * Everything on the camera's side of the line, landscape and site, is cut away and the cut
-   * faces are drawn on it.
+   * The cross-section: `{ line: { from, normal }, samples, landscape, layers }`, the samples along
+   * the block from `crossSection` and the landscape's along the whole surroundings, or null for
+   * none. The basemap and terrain on the camera's side of the line are cut away, and the redox
+   * layers and probes too when `layers` is true; the cut faces are drawn on the line.
    */
   setCut(cut) {
     this.cut = cut;
@@ -542,18 +543,23 @@ export class SiteScene {
     this.curtain = null;
     this.landscapeFace = null;
     const planes = cut ? [this.plane] : [];
-    for (const material of this.clippable) material.clippingPlanes = planes;
+    const layerPlanes = cut?.layers ? [this.plane] : [];
+    for (const material of this.clippable.basemap) material.clippingPlanes = planes;
+    for (const material of this.clippable.layers) material.clippingPlanes = layerPlanes;
     this.probes.traverse(o => {
-      if (o.isMesh) o.material.clippingPlanes = planes;
+      if (o.isMesh) o.material.clippingPlanes = layerPlanes;
     });
     if (!cut) return;
 
     const [nx, ny] = cut.line.normal;
     const [fx, fy] = cut.line.from;
     this.plane.setFromNormalAndCoplanarPoint(new THREE.Vector3(nx, 0, -ny), new THREE.Vector3(fx, 0, -fy));
-    this.curtain = this.buildCurtain(cut.samples);
-    this.scene.add(this.curtain.group);
-    this.layoutCurtain();
+    // The layers' own cut face shows only when they are cut; left whole, they show themselves.
+    if (cut.layers) {
+      this.curtain = this.buildCurtain(cut.samples);
+      this.scene.add(this.curtain.group);
+      this.layoutCurtain();
+    }
     if (cut.landscape) {
       this.landscapeFace = this.buildLandscapeFace(cut.landscape);
       this.context.add(this.landscapeFace);
@@ -838,8 +844,10 @@ export class SiteScene {
       ...this.slices.filter(s => s.group.visible).map(s => s.mesh),
     ].filter(o => o.visible);
     for (const hit of raycaster.intersectObjects(targets, false)) {
-      if (this.cut && this.plane.distanceToPoint(hit.point) < 0) continue;
       const { kind } = hit.object.userData;
+      const layered = kind === 'slice' || kind === 'probe' || hit.object.parent?.parent === this.probes;
+      const cutAway = layered ? this.cut?.layers : this.cut;
+      if (cutAway && this.plane.distanceToPoint(hit.point) < 0) continue;
       const e = hit.point.x;
       const n = -hit.point.z;
       if ((hit.object.material.userData.peel ?? 1) < 0.5) continue;
