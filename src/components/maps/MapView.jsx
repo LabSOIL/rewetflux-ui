@@ -3,6 +3,7 @@ import { MapContainer, Pane, ScaleControl, ZoomControl, useMap } from 'react-lea
 import 'leaflet/dist/leaflet.css';
 import { CatchmentLayers } from './Catchment';
 import MapLogos from './MapLogos';
+import TowerMarker from './TowerMarker';
 import { MAX_ZOOM } from './basemap';
 import { applySiteOpeningView, panelReach } from './siteOpeningView';
 import { mapViewOf, useView, zoomFor } from '../../contexts/ViewContext';
@@ -103,6 +104,7 @@ export default function MapView({
           redoxMin={redoxMin}
           redoxMax={redoxMax}
         />
+        <TowerMarker />
       </MapContainer>
       {view && view.mode !== '2d' && (
         <Suspense fallback={null}>

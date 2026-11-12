@@ -23,9 +23,10 @@ python3 scripts/terrain.py
 ```
 
 `scripts/tower.py` writes the tower model, `src/data/tower.glb`, from its CAD STEP file: the parts
-under 50 mm are dropped and the rest meshed to its outline and joins, 2.5 m tall. The view stands it
-near the middle of the polygon, true to size close in and at least 96 px tall further out. It needs
-FreeCAD's Python modules:
+under 50 mm are dropped and the rest meshed to its outline and joins, 2.5 m tall. The 3D view stands
+it near the middle of the polygon, true to size close in and at least 96 px tall further out. The
+script also draws the 2D map's icon of it from the same mesh (`src/data/tower-icon.png`), shown at
+the same spot. It needs FreeCAD's Python modules, NumPy and Matplotlib:
 
 ```bash
 python3 scripts/tower.py path/to/Tower.stp

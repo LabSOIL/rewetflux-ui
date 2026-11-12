@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cutLine, densifyRing, innerPoint, insideRing, localFrame, ringCentre, viewCutAngle } from './geo';
+import { cutLine, densifyRing, innerLonLat, innerPoint, insideRing, localFrame, ringCentre, viewCutAngle } from './geo';
 import { terrainModel } from './terrain';
 
 describe('localFrame', () => {
@@ -55,6 +55,15 @@ describe('rings', () => {
     expect(insideRing(point, u)).toBe(true);
     expect(point[1]).toBe(5);
     expect(point[0]).toBeCloseTo(1.5);
+  });
+
+  it("gives the inner point in longitude and latitude, the same point the local frame's ring has", () => {
+    const u = [[7.0, 46.0], [7.002, 46.0], [7.002, 46.002], [7.0014, 46.002], [7.0014, 46.0006], [7.0006, 46.0006], [7.0006, 46.002], [7.0, 46.002]];
+    const frame = localFrame([7.0, 46.0, 7.002, 46.002]);
+    const [e, n] = frame.toLocal(...innerLonLat(u));
+    const [ie, inn] = innerPoint(u.map(([lon, lat]) => frame.toLocal(lon, lat)));
+    expect(e).toBeCloseTo(ie, 6);
+    expect(n).toBeCloseTo(inn, 6);
   });
 });
 

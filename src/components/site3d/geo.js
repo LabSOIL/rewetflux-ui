@@ -89,6 +89,9 @@ export function innerPoint(ring) {
   return best ? [best.x, cy] : [cx, cy];
 }
 
+/** The inner point of a ring of [lon, lat], found in Web Mercator as the 3D view's local frame finds it. */
+export const innerLonLat = ring => lonLat(...innerPoint(ring.map(([lon, lat]) => mercator(lon, lat))));
+
 /**
  * The direction in degrees, anticlockwise from east, of a cut line across the line of sight of a
  * camera at `azimuth` (radians, 0 looking north): its left normal points the way the camera looks.
