@@ -5,7 +5,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { BaseChooser, BaseLayers, DEFAULT_BASEMAP_ID } from './Layers';
 import Legend from './Legend';
-import { mapViewOf, useView } from '../../contexts/ViewContext';
+import { useView } from '../../contexts/ViewContext';
 import './MapView.css';
 
 /** The checkbox for the redox layers at four depths: they show in 3D, so ticking it opens the 3D view and unticking it leaves. */
@@ -57,7 +57,7 @@ export default function MapCard({ legend }) {
       {container && createPortal(
         <>
           <BaseChooser baseId={baseId} overlayIds={overlayIds} onBase={setBaseId} onOverlay={toggleOverlay} />
-          {view && <RedoxLayersToggle on={view.mode !== '2d'} onChange={() => view.open3D(mapViewOf(map))} />}
+          {view && <RedoxLayersToggle on={view.mode !== '2d'} onChange={view.toggle3D} />}
           {legend && (
             <>
               <hr className="map-card-separator" />

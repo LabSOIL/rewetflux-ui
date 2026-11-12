@@ -42,10 +42,12 @@ describe('App', () => {
     expect(container.querySelector('[data-section]')).toBeNull();
   });
 
-  it('renders a Variable button and a depth gauge above an Info button', () => {
+  it('renders a Variable button, a 3D layers button and a depth gauge above an Info button', () => {
     const rail = container.querySelector('.side-panel');
     const top = [...rail.querySelectorAll('.button-group.top button')];
-    expect(top.map(b => b.querySelector('.current-selection').textContent)).toEqual(['Redox']);
+    expect(top.map(b => b.querySelector('.current-selection').textContent)).toEqual(['Redox', 'Off']);
+    expect(top[1].textContent).toContain('3D layers');
+    expect(top[1].getAttribute('aria-pressed')).toBe('false');
     expect(rail.querySelector('[aria-label="Depth below surface"]')).not.toBeNull();
     const bottom = [...rail.querySelectorAll('.button-group.bottom button')];
     expect(bottom.map(b => b.textContent)).toEqual(['Info']);

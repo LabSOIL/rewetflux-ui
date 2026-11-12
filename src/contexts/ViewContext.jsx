@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { DEFAULT_BASEMAP_ID } from '../components/maps/basemap';
 
 const ViewContext = createContext(null);
@@ -57,6 +57,15 @@ export function ViewProvider({ children, start3D = opensIn3D }) {
     setMode('3d');
   }, []);
   const leave3D = useCallback(() => setMode(current => (current === '3d' ? 'leaving' : current)), []);
+  // The map registers how to read its view, so the 3D layers can open from where it is.
+  const mapView = useRef(null);
+  const registerMap = useCallback(readView => {
+    mapView.current = readView;
+  }, []);
+  const toggle3D = useCallback(() => {
+    if (mode === '2d') open3D(mapView.current?.() ?? null);
+    else leave3D();
+  }, [mode, open3D, leave3D]);
   const closed = useCallback(() => {
     setShown(false);
     setMode('2d');
@@ -78,9 +87,11 @@ export function ViewProvider({ children, start3D = opensIn3D }) {
       toggleOverlay,
       open3D,
       leave3D,
+      toggle3D,
+      registerMap,
       closed,
     }),
-    [mode, from, shown, baseId, overlayIds, returnTo, autoTilt, toggleOverlay, open3D, leave3D, closed],
+    [mode, from, shown, baseId, overlayIds, returnTo, autoTilt, toggleOverlay, open3D, leave3D, toggle3D, registerMap, closed],
   );
   return <ViewContext.Provider value={value}>{children}</ViewContext.Provider>;
 }

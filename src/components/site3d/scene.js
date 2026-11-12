@@ -15,8 +15,6 @@ const PROBE_TOP = 8;
 const LANDSCAPE_FLOOR = 40;
 const FLY_MS = 1000;
 const OBLIQUE = { polar: 0.9, azimuth: -0.38 };
-// The share of their colour the surroundings keep once the slices hang below, so the site stands out.
-const SHADED = 0.8;
 // The tilt in radians at which the slices hang at their full spacing; they drop as the view tilts towards it.
 export const TILTED = 0.9;
 // A view tilted less than this counts as flat, so handing back to the map needs no flight.
@@ -175,6 +173,7 @@ export class SiteScene {
     this.chosenSpacing = spacing;
     this.spacing = 0;
     this.shade = 1;
+    this.basemapShare = 1;
     this.dragging = false;
     this.steering = false;
     this.compass = null;
@@ -512,6 +511,11 @@ export class SiteScene {
     }
   }
 
+  /** The share of its colour the basemap around the layers keeps at full tilt, 0 to 1; flat, it is whole. */
+  setBasemapShare(share) {
+    this.basemapShare = share;
+  }
+
   /** The slices' spacing at full tilt, in metres per 10 cm of depth. */
   chooseSpacing(spacing) {
     this.chosenSpacing = spacing;
@@ -778,7 +782,7 @@ export class SiteScene {
     const k = smooth(clamp01(polar / TILTED));
     const spacing = this.chosenSpacing * k;
     if (Math.abs(spacing - this.spacing) > 0.01) this.setSpacing(spacing);
-    const shade = lerp(1, SHADED, k);
+    const shade = lerp(1, this.basemapShare, k);
     if (Math.abs(shade - this.shade) > 0.002) this.setShade(shade);
     if (!this.compass || Math.abs(this.compass[0] - azimuth) > 0.003 || Math.abs(this.compass[1] - polar) > 0.003) {
       this.compass = [azimuth, polar];

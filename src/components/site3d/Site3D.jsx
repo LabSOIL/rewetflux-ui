@@ -35,6 +35,8 @@ const BASEMAP_ZOOM = 19;
 const SURROUNDINGS_ZOOMS = [16, 17];
 // Metres of drop per 10 cm of depth when the scene opens.
 const DEFAULT_SPACING = 30;
+// The share in % of its colour the basemap keeps behind the layers, so it does not compete with them.
+const DEFAULT_BASEMAP_STRENGTH = 35;
 // The generated variation as a share of the readings' range.
 const NOISE_SHARE = 0.3;
 const NOISE_SEED = 7;
@@ -201,6 +203,7 @@ export default function Site3D() {
   const start = useRef(mapView(model, view.from));
   const [phase, setPhase] = useState('loading');
   const [spacing, setSpacing] = useState(DEFAULT_SPACING);
+  const [basemapStrength, setBasemapStrength] = useState(DEFAULT_BASEMAP_STRENGTH);
   const [groundOn, setGroundOn] = useState(true);
   const [peel, setPeel] = useState(false);
   const [cutOn, setCutOn] = useState(false);
@@ -337,6 +340,10 @@ export default function Site3D() {
   }, [groundOn]);
 
   useEffect(() => {
+    scene.current.setBasemapShare(basemapStrength / 100);
+  }, [basemapStrength]);
+
+  useEffect(() => {
     scene.current.setAutoTilt(view.autoTilt);
   }, [view.autoTilt]);
 
@@ -404,7 +411,7 @@ export default function Site3D() {
           </div>
         )}
         <div className="map-card site3d-card">
-          <RedoxLayersToggle on={view.mode === '3d'} onChange={view.leave3D} />
+          <RedoxLayersToggle on={view.mode === '3d'} onChange={view.toggle3D} />
           <BaseChooser
             name="basemap-3d"
             baseId={view.baseId}
@@ -413,6 +420,21 @@ export default function Site3D() {
             onOverlay={view.toggleOverlay}
           />
           <hr className="map-card-separator" />
+          <div className="site3d-control">
+            <div className="site3d-control-label">
+              <span>Basemap strength</span>
+              <span className="site3d-control-value">{basemapStrength}%</span>
+            </div>
+            <Slider
+              size="small"
+              min={0}
+              max={100}
+              value={basemapStrength}
+              onChange={(_, value) => setBasemapStrength(value)}
+              aria-label="Basemap strength"
+              sx={sliderSx}
+            />
+          </div>
           <div className="site3d-control">
             <div className="site3d-control-label">
               <span>Layer spacing</span>

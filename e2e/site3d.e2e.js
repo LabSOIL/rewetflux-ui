@@ -59,3 +59,15 @@ test('the site opens on the 2D map, on the aerial basemap', async ({ browser }) 
     await expect(page.locator(PANELS.card).getByLabel('Aerial')).toBeChecked();
     await page.close();
 });
+
+test('the rail\'s 3D layers button opens the 3D view and closes it again', async ({ browser }) => {
+    const page = await openSite(browser, WINDOW_SIZES[0]);
+    const button = page.locator(PANELS.rail).getByRole('button', { name: /3D layers/ });
+    await button.click();
+    await page.locator(SITE_3D.hint).waitFor();
+    await expect(button).toHaveAttribute('aria-pressed', 'true');
+    await button.click();
+    await page.locator(SITE_3D.root).waitFor({ state: 'detached' });
+    await expect(button).toHaveAttribute('aria-pressed', 'false');
+    await page.close();
+});

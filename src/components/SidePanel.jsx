@@ -1,17 +1,21 @@
 import { useState } from 'react';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import LayersOutlinedIcon from '@mui/icons-material/LayersOutlined';
+import ViewInArOutlinedIcon from '@mui/icons-material/ViewInArOutlined';
 import './SidePanel.css';
 import ChoicePanel from './Panels/Choice';
 import InfoPanel from './Panels/Info';
 import DepthGauge from './DepthGauge';
 import { useSelection } from '../contexts/SelectionContext';
+import { useView } from '../contexts/ViewContext';
 import { VARIABLES, optionLabel } from '../utils/selection';
 import { hasDateBar } from '../utils/stops';
 
 export default function SidePanel() {
   const { variable, option, options, stops, selectVariable, selectOption } = useSelection();
   const [activePanel, setActivePanel] = useState(null);
+  const view = useView();
+  const layers3D = view != null && view.mode !== '2d';
 
   const variableLabel = VARIABLES.find(v => v.key === variable)?.label ?? '';
 
@@ -34,6 +38,15 @@ export default function SidePanel() {
             <span className="current-selection">{variableLabel}</span>
           </div>
         </button>
+        {view && (
+          <button onClick={view.toggle3D} className={layers3D ? 'active' : ''} aria-pressed={layers3D}>
+            <div className="button-content">
+              <ViewInArOutlinedIcon />
+              <span>3D layers</span>
+              <span className="current-selection">{layers3D ? 'On' : 'Off'}</span>
+            </div>
+          </button>
+        )}
       </div>
 
       <DepthGauge options={options} selected={option} onSelect={selectOption} />

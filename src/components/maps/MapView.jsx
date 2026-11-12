@@ -5,7 +5,7 @@ import { CatchmentLayers } from './Catchment';
 import MapLogos from './MapLogos';
 import { MAX_ZOOM } from './basemap';
 import { applySiteOpeningView, panelReach } from './siteOpeningView';
-import { useView, zoomFor } from '../../contexts/ViewContext';
+import { mapViewOf, useView, zoomFor } from '../../contexts/ViewContext';
 import './MapView.css';
 
 const Site3D = lazy(() => import('../site3d/Site3D'));
@@ -25,6 +25,16 @@ function Prepare3D() {
     }, PREPARE_AFTER_MS);
     return () => clearTimeout(timer);
   }, [baseId, overlayIds]);
+  return null;
+}
+
+// Lets the view context read the map's view, so the 3D layers open from where the map is.
+function RegisterMap() {
+  const map = useMap();
+  const registerMap = useView()?.registerMap;
+  useEffect(() => {
+    registerMap?.(() => mapViewOf(map));
+  }, [map, registerMap]);
   return null;
 }
 
@@ -76,6 +86,7 @@ export default function MapView({
         <SiteOpeningView extent={extent} />
         <Prepare3D />
         <ReturnView />
+        <RegisterMap />
         <Pane name="rasterPane" style={{ zIndex: 450 }} />
         <ZoomControl position="bottomright" />
         <ScaleControl imperial={false} maxWidth={250} />
