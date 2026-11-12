@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { DEPTHS } from './fields';
-import { densifyRing, insideRing, ringCentre } from './geo';
+import { densifyRing, insideRing, ringCentre, viewCutAngle } from './geo';
 import { theme } from '../../theme';
 
 // Scene axes: x east, y metres above the terrain base, z south.
@@ -13,6 +13,11 @@ const EDGE_STEP = 1.5;
 const PROBE_TOP = 8;
 // How far below the lowest ground along a cut the landscape's cut face reaches, in metres.
 const LANDSCAPE_FLOOR = 40;
+// A following cut eases this share of the way to the view's heading each frame, its faces are
+// rebuilt once it has turned this many degrees, and the profile is sent at most this often.
+const CUT_EASE = 0.12;
+const CUT_REBUILD_DEGREES = 0.25;
+const PROFILE_MS = 250;
 const FLY_MS = 1000;
 const OBLIQUE = { polar: 0.9, azimuth: -0.38 };
 // The tilt in radians at which the slices hang at their full spacing; they drop as the view tilts towards it.
@@ -47,6 +52,8 @@ const MISSING = new THREE.Color(theme.disabled);
 
 const ease = t => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 const lerp = (a, b, t) => a + (b - a) * t;
+// The angle in degrees from a to b the short way round.
+const turnDegrees = (a, b) => ((((b - a + 180) % 360) + 360) % 360) - 180;
 // The angle from a to b the short way round.
 const turn = (a, b) => ((((b - a + Math.PI) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) - Math.PI;
 const blendViews = (from, to, k) => ({
@@ -163,13 +170,17 @@ function makeLabel(text, onClick) {
  * through the set* methods.
  */
 export class SiteScene {
-  constructor(container, { terrain, ring, grid, coverage, positions, surroundings, spacing, flat, autoTilt, onHover, onPick, onCompass }) {
+  constructor(container, { terrain, ring, grid, coverage, positions, surroundings, spacing, flat, autoTilt, onHover, onPick, onCompass, onCutSamples }) {
     this.container = container;
     this.terrain = terrain;
     this.ring = ring;
     this.onHover = onHover;
     this.onPick = onPick;
     this.onCompass = onCompass;
+    this.onCutSamples = onCutSamples;
+    this.cutAngle = null;
+    this.profileAt = 0;
+    this.profileDue = false;
     this.chosenSpacing = spacing;
     this.spacing = 0;
     this.shade = 1;
@@ -523,13 +534,29 @@ export class SiteScene {
   }
 
   /**
-   * The cross-section: `{ line: { from, normal }, samples, landscape, layers }`, the samples along
-   * the block from `crossSection` and the landscape's along the whole surroundings, or null for
-   * none. The basemap and terrain on the camera's side of the line are cut away, and the redox
-   * layers and probes too when `layers` is true; the cut faces are drawn on the line.
+   * The cross-section, or null for none: `{ cutAt, follow, angle, layers }`. `cutAt(angle)` gives
+   * the cut line at a direction in degrees, with the samples along the block and along the
+   * landscape, `{ line, samples, landscape }`. With `follow` the direction eases towards the
+   * camera's heading each frame, else it is `angle`. The basemap and terrain on the camera's side
+   * are cut away, and the redox layers and probes too when `layers` is true.
    */
   setCut(cut) {
     this.cut = cut;
+    if (!cut) {
+      this.clearCut();
+      this.cutAngle = null;
+      this.onCutSamples?.(null);
+      return;
+    }
+    if (this.cutAngle == null || !cut.follow) this.cutAngle = this.wantedCutAngle();
+    this.buildCut();
+  }
+
+  wantedCutAngle() {
+    return this.cut.follow ? viewCutAngle(this.currentView().azimuth) : this.cut.angle;
+  }
+
+  clearCut() {
     const drop = (root, part) => {
       if (!part) return;
       root.remove(part);
@@ -542,27 +569,55 @@ export class SiteScene {
     drop(this.context, this.landscapeFace);
     this.curtain = null;
     this.landscapeFace = null;
-    const planes = cut ? [this.plane] : [];
-    const layerPlanes = cut?.layers ? [this.plane] : [];
+    this.clipWith(false);
+  }
+
+  clipWith(on) {
+    const planes = on ? [this.plane] : [];
+    const layerPlanes = on && this.cut?.layers ? [this.plane] : [];
     for (const material of this.clippable.basemap) material.clippingPlanes = planes;
     for (const material of this.clippable.layers) material.clippingPlanes = layerPlanes;
     this.probes.traverse(o => {
       if (o.isMesh) o.material.clippingPlanes = layerPlanes;
     });
-    if (!cut) return;
+  }
 
-    const [nx, ny] = cut.line.normal;
-    const [fx, fy] = cut.line.from;
+  // The cut at the current angle: the plane, the layers' cut face when they are cut, the landscape's.
+  buildCut() {
+    this.clearCut();
+    const { line, samples, landscape } = this.cut.cutAt(this.cutAngle);
+    this.builtAngle = this.cutAngle;
+    this.cutSamples = line ? samples : null;
+    this.profileDue = true;
+    if (!line) return;
+    const [nx, ny] = line.normal;
+    const [fx, fy] = line.from;
     this.plane.setFromNormalAndCoplanarPoint(new THREE.Vector3(nx, 0, -ny), new THREE.Vector3(fx, 0, -fy));
+    if (this.plane.distanceToPoint(this.camera.position) > 0) this.plane.negate();
+    this.clipWith(true);
     // The layers' own cut face shows only when they are cut; left whole, they show themselves.
-    if (cut.layers) {
-      this.curtain = this.buildCurtain(cut.samples);
+    if (this.cut.layers) {
+      this.curtain = this.buildCurtain(samples);
       this.scene.add(this.curtain.group);
       this.layoutCurtain();
     }
-    if (cut.landscape) {
-      this.landscapeFace = this.buildLandscapeFace(cut.landscape);
+    if (landscape) {
+      this.landscapeFace = this.buildLandscapeFace(landscape);
       this.context.add(this.landscapeFace);
+    }
+  }
+
+  // Each frame the cut's angle eases towards the wanted one and its faces follow once it has moved;
+  // the profile is sent at most once a PROFILE_MS.
+  stepCut(now) {
+    if (!this.cut) return;
+    const gap = turnDegrees(this.cutAngle, this.wantedCutAngle());
+    if (Math.abs(gap) > 0.05) this.cutAngle = (this.cutAngle + gap * CUT_EASE + 360) % 360;
+    if (Math.abs(turnDegrees(this.builtAngle, this.cutAngle)) > CUT_REBUILD_DEGREES) this.buildCut();
+    if (this.profileDue && now - this.profileAt >= PROFILE_MS) {
+      this.profileDue = false;
+      this.profileAt = now;
+      this.onCutSamples?.(this.cutSamples);
     }
   }
 
@@ -820,6 +875,7 @@ export class SiteScene {
     else this.controls.update();
     this.followTilt();
     this.stepPeel();
+    this.stepCut(now);
     if (this.cut && this.plane.distanceToPoint(this.camera.position) > 0) this.plane.negate();
     if (this.pointer?.moved && !this.flight) {
       this.pointer.moved = false;

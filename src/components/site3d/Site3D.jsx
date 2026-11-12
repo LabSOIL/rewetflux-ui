@@ -10,7 +10,6 @@ import { stops } from '../../utils/stops';
 import { BASEMAP_LAYERS } from '../maps/basemap';
 import { BaseChooser } from '../maps/Layers';
 import Legend from '../maps/Legend';
-import { RedoxLayersToggle } from '../maps/MapCard';
 import {
   DEPTHS,
   colourLookup,
@@ -21,7 +20,7 @@ import {
   readingRange,
   ringCoverage,
 } from './fields';
-import { cutLine, ringCentre, viewCutAngle } from './geo';
+import { cutLine, ringCentre } from './geo';
 import ProfilePanel from './ProfilePanel';
 import { SiteScene, ZOOM_STEP } from './scene';
 import { terrainModel } from './terrain';
@@ -36,12 +35,11 @@ const SURROUNDINGS_ZOOMS = [16, 17];
 // Metres of drop per 10 cm of depth when the scene opens.
 const DEFAULT_SPACING = 30;
 // The share in % of its colour the basemap keeps behind the layers, so it does not compete with them.
-const DEFAULT_BASEMAP_STRENGTH = 35;
+const DEFAULT_BASEMAP_STRENGTH = 10;
 // The generated variation as a share of the readings' range.
 const NOISE_SHARE = 0.3;
 const NOISE_SEED = 7;
 const CUT_SAMPLES = 240;
-const CUT_TURN_MS = 100;
 const LANDSCAPE_SAMPLES = 400;
 const SHOW_MS = 120;
 const FADE_MS = 200;
@@ -212,49 +210,44 @@ export default function Site3D() {
   const [cutAngle, setCutAngle] = useState(90);
   const [cutFollows, setCutFollows] = useState(true);
   const [cutLayers, setCutLayers] = useState(false);
-  // The camera's heading as a cut direction in whole degrees, sent at most every CUT_TURN_MS while the view turns.
-  const [viewAngle, setViewAngle] = useState(0);
-  const angleSent = useRef({ at: 0, timer: null });
+  const [profile, setProfile] = useState(null);
   const [hover, setHover] = useState(null);
 
   const campaign = model.campaigns.find(c => c.date === date) ?? model.campaigns[model.campaigns.length - 1];
   const rasters = useMemo(() => campaignRasters(model, campaign), [model, campaign]);
 
-  const samples = useMemo(() => {
-    if (!cutOn) return null;
+  // The cut line at a direction in degrees, with the samples along the block for the layers' face
+  // and the profile, and along the whole surroundings for the landscape's face.
+  const cutAt = useMemo(() => {
     const { halfWidth, halfHeight } = model.terrain.frame;
-    const angle = cutFollows ? viewAngle : cutAngle;
-    const line = cutLine(model.centre, angle, cutOffset * model.reach, halfWidth, halfHeight);
-    if (!line) return null;
-    // The same line, run across the whole surroundings.
-    const {
-      offset: [oe, on],
-      halfWidth: aw,
-      halfHeight: ah,
-    } = model.landscape;
-    const long = cutLine([model.centre[0] - oe, model.centre[1] - on], angle, cutOffset * model.reach, aw, ah);
-    return {
-      line,
-      landscape:
-        long &&
-        crossSection({
-          from: [long.from[0] + oe, long.from[1] + on],
-          to: [long.to[0] + oe, long.to[1] + on],
-          count: LANDSCAPE_SAMPLES,
-          heightAt: model.landscapeHeight,
-          fields: [],
+    const { offset: [oe, on], halfWidth: aw, halfHeight: ah } = model.landscape;
+    return angle => {
+      const line = cutLine(model.centre, angle, cutOffset * model.reach, halfWidth, halfHeight);
+      if (!line) return { line: null };
+      const long = cutLine([model.centre[0] - oe, model.centre[1] - on], angle, cutOffset * model.reach, aw, ah);
+      return {
+        line,
+        samples: crossSection({
+          from: line.from,
+          to: line.to,
+          count: CUT_SAMPLES,
+          heightAt: model.terrain.heightAt,
+          fields: rasters.fields,
           ring: model.ring,
         }),
-      points: crossSection({
-        from: line.from,
-        to: line.to,
-        count: CUT_SAMPLES,
-        heightAt: model.terrain.heightAt,
-        fields: rasters.fields,
-        ring: model.ring,
-      }),
+        landscape:
+          long &&
+          crossSection({
+            from: [long.from[0] + oe, long.from[1] + on],
+            to: [long.to[0] + oe, long.to[1] + on],
+            count: LANDSCAPE_SAMPLES,
+            heightAt: model.landscapeHeight,
+            fields: [],
+            ring: model.ring,
+          }),
+      };
     };
-  }, [cutOn, cutAngle, cutFollows, viewAngle, cutOffset, model, rasters]);
+  }, [cutOffset, model, rasters]);
 
   // The slices are redox, so the rail switches to it once, as the view opens.
   const entered = useRef(false);
@@ -266,17 +259,8 @@ export default function Site3D() {
 
   const needle = useRef(null);
   useEffect(() => {
-    const sent = angleSent.current;
-    const sendAngle = angle => {
-      sent.at = performance.now();
-      setViewAngle(Math.round(angle) % 360);
-    };
     const onCompass = (azimuth, polar) => {
       if (needle.current) needle.current.style.transform = `rotateX(${polar}rad) rotateZ(${azimuth}rad)`;
-      const angle = viewCutAngle(azimuth);
-      clearTimeout(sent.timer);
-      if (performance.now() - sent.at > CUT_TURN_MS) sendAngle(angle);
-      else sent.timer = setTimeout(() => sendAngle(angle), CUT_TURN_MS);
     };
     // The distance at which the scene shows the ground at the map's scale at the flat zoom.
     const lat = model.terrain.frame.toLonLat(...model.centre)[1];
@@ -290,13 +274,11 @@ export default function Site3D() {
       onHover: setHover,
       onPick: selectOption,
       onCompass,
+      onCutSamples: setProfile,
     });
     site.show(site.topDownView(start.current.centre, start.current.height));
     scene.current = site;
-    return () => {
-      clearTimeout(sent.timer);
-      site.dispose();
-    };
+    return () => site.dispose();
   }, [model, selectOption]);
 
   // The block's basemap and the coarse surroundings' first, then the sharper surroundings'.
@@ -341,15 +323,8 @@ export default function Site3D() {
   }, [peel]);
 
   useEffect(() => {
-    scene.current.setCut(
-      samples && {
-        line: samples.line,
-        samples: samples.points,
-        landscape: samples.landscape,
-        layers: cutLayers,
-      },
-    );
-  }, [samples, cutLayers]);
+    scene.current.setCut(cutOn ? { cutAt, follow: cutFollows, angle: cutAngle, layers: cutLayers } : null);
+  }, [cutOn, cutAt, cutFollows, cutAngle, cutLayers]);
 
   useEffect(() => {
     scene.current.chooseSpacing(spacing);
@@ -427,11 +402,10 @@ export default function Site3D() {
         {phase === 'open' && (
           <div className="site3d-hint">
             Scroll to zoom, drag to move, right-drag or Shift-drag to turn and tilt. Click a slice to pick its depth.
-            Untick the redox layers to return to the map.
+            Turn 3D layers off in the side bar to return to the map.
           </div>
         )}
         <div className="map-card site3d-card">
-          <RedoxLayersToggle on={view.mode === '3d'} onChange={view.toggle3D} />
           <BaseChooser
             name="basemap-3d"
             baseId={view.baseId}
@@ -535,7 +509,7 @@ export default function Site3D() {
             {variable === 'redox' ? 'Slices generated from the probe readings' : 'The slices show redox'}
           </p>
         </div>
-        {samples && <ProfilePanel samples={samples.points} colour={rasters.colour} base={model.terrain.base} />}
+        {cutOn && profile && <ProfilePanel samples={profile} colour={rasters.colour} base={model.terrain.base} />}
         {hover && (
           <div className="site3d-tooltip" style={{ left: hover.clientX, top: hover.clientY }}>
             {tooltipText(hover)}

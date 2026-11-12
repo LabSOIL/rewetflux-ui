@@ -8,18 +8,10 @@ import Legend from './Legend';
 import { useView } from '../../contexts/ViewContext';
 import './MapView.css';
 
-/** The checkbox for the redox layers at four depths: they show in 3D, so ticking it opens the 3D view and unticking it leaves. */
-export const RedoxLayersToggle = ({ on, onChange }) => (
-  <label className="map-card-3d">
-    <input type="checkbox" checked={on} onChange={event => onChange(event.target.checked)} />
-    <span>Redox layers (3D)</span>
-  </label>
-);
-
 /**
- * One card at the top right of the map: the toggle for the 3D redox layers where they are offered, the
- * basemap chooser, a separator and, when a variable is selected, its legend. The card sets the
- * width of all of them. The basemap choice is the view's, shared with the 3D scene, when there is one.
+ * One card at the top right of the map: the basemap chooser, a separator and, when a variable is
+ * selected, its legend. The card sets the width of both. The basemap choice is the view's, shared
+ * with the 3D scene, when there is one.
  */
 export default function MapCard({ legend }) {
   const map = useMap();
@@ -57,7 +49,6 @@ export default function MapCard({ legend }) {
       {container && createPortal(
         <>
           <BaseChooser baseId={baseId} overlayIds={overlayIds} onBase={setBaseId} onOverlay={toggleOverlay} />
-          {view && <RedoxLayersToggle on={view.mode !== '2d'} onChange={view.toggle3D} />}
           {legend && (
             <>
               <hr className="map-card-separator" />

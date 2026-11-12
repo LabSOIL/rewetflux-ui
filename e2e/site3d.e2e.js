@@ -2,10 +2,10 @@ import { test, expect } from '@playwright/test';
 import { MAP_CONTAINER, PANELS, SITE_3D, WINDOW_SIZES } from './selectors.js';
 import { openSite, overlaps } from './support.js';
 
-const REDOX_LAYERS = 'Redox layers (3D)';
+const layersButton = page => page.locator(PANELS.rail).getByRole('button', { name: /3D layers/ });
 
 const open3D = async page => {
-    await page.locator(PANELS.card).getByLabel(REDOX_LAYERS).check();
+    await layersButton(page).click();
     await page.locator(SITE_3D.hint).waitFor();
 };
 
@@ -39,7 +39,7 @@ for (const size of WINDOW_SIZES.slice(0, 2)) {
     });
 }
 
-test('ticking the redox layers draws them in 3D over the map, and unticking them hands back to the map', async ({ browser }) => {
+test('the 3D layers draw over the map, and turning them off hands back to the map', async ({ browser }) => {
     const page = await openSite(browser, WINDOW_SIZES[0]);
     await open3D(page);
     const canvas = await page.locator(SITE_3D.canvas).boundingBox();
@@ -47,7 +47,7 @@ test('ticking the redox layers draws them in 3D over the map, and unticking them
     for (const side of ['x', 'y', 'width', 'height']) expect(Math.abs(canvas[side] - map[side]), side).toBeLessThan(1);
     await expect(page.locator(MAP_CONTAINER)).toHaveCSS('opacity', '0');
 
-    await page.locator(SITE_3D.card).getByLabel(REDOX_LAYERS).uncheck();
+    await layersButton(page).click();
     await page.locator(SITE_3D.root).waitFor({ state: 'detached' });
     await expect(page.locator(MAP_CONTAINER)).toHaveCSS('opacity', '1');
     await page.close();
@@ -57,6 +57,7 @@ test('the site opens on the 2D map, on the aerial basemap', async ({ browser }) 
     const page = await openSite(browser, WINDOW_SIZES[0]);
     await expect(page.locator(SITE_3D.root)).toHaveCount(0);
     await expect(page.locator(PANELS.card).getByLabel('Aerial')).toBeChecked();
+    await expect(page.locator(PANELS.card).getByText(/3D/)).toHaveCount(0);
     await page.close();
 });
 
