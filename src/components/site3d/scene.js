@@ -13,14 +13,17 @@ const EDGE_STEP = 1.5;
 const PROBE_TOP = 8;
 // How far below the lowest ground along a cut the landscape's cut face reaches, in metres.
 const LANDSCAPE_FLOOR = 40;
-// A following cut eases this share of the way to the view's heading each frame, its faces are
-// rebuilt once it has turned this many degrees, and the profile is sent at most this often.
+// A following cut eases this share of the way to the view's heading each frame; its plane turns
+// with it every frame, its faces are rebuilt once it has turned this many degrees, and the
+// profile is sent once the faces have stood still this long.
 const CUT_EASE = 0.12;
+const CUT_REBUILD_DEGREES = 1;
+const PROFILE_SETTLE_MS = 250;
 // The cut shows only on a tilted view: it turns on above the first tilt and off below the second, in radians.
 const CUT_ON_TILT = (10 * Math.PI) / 180;
 const CUT_OFF_TILT = (7 * Math.PI) / 180;
-const CUT_REBUILD_DEGREES = 0.25;
-const PROFILE_MS = 250;
+// Hovering picks at most this often, and never while the view is dragged.
+const PICK_MS = 100;
 const FLY_MS = 1000;
 const OBLIQUE = { polar: 0.9, azimuth: -0.38 };
 // The tilt in radians at which the slices hang at their full spacing; they drop as the view tilts towards it.
@@ -183,8 +186,10 @@ export class SiteScene {
     this.onCutSamples = onCutSamples;
     this.cutAngle = null;
     this.cutActive = false;
-    this.profileAt = 0;
+    this.builtAt = 0;
+    this.pickedAt = 0;
     this.profileDue = false;
+    this.profileNow = false;
     this.chosenSpacing = spacing;
     this.spacing = 0;
     this.shade = 1;
@@ -373,6 +378,26 @@ export class SiteScene {
     }
     this.surface.material.color.set(theme.white);
     this.setShade(this.shade);
+  }
+
+  /**
+   * Compiles every material's shader and uploads every texture now, slices shown for the while,
+   * so the first frames on screen do not stall on them.
+   */
+  warm() {
+    const hidden = this.slices.filter(slice => !slice.group.visible);
+    for (const slice of hidden) slice.group.visible = true;
+    this.renderer.compile(this.context, this.camera);
+    this.renderer.compile(this.scene, this.camera);
+    for (const slice of hidden) slice.group.visible = false;
+    for (const root of [this.context, this.scene]) {
+      root.traverse(o => {
+        for (const key of ['map', 'alphaMap']) {
+          const texture = o.material?.[key];
+          if (texture) this.renderer.initTexture(texture);
+        }
+      });
+    }
   }
 
   /** The basemap drawn over the surroundings, as a canvas spanning their bounds. */
@@ -591,13 +616,11 @@ export class SiteScene {
     this.clearCut();
     const { line, samples, landscape } = this.cut.cutAt(this.cutAngle);
     this.builtAngle = this.cutAngle;
+    this.builtAt = performance.now();
     this.cutSamples = line ? samples : null;
     this.profileDue = true;
     if (!line) return;
-    const [nx, ny] = line.normal;
-    const [fx, fy] = line.from;
-    this.plane.setFromNormalAndCoplanarPoint(new THREE.Vector3(nx, 0, -ny), new THREE.Vector3(fx, 0, -fy));
-    if (this.plane.distanceToPoint(this.camera.position) > 0) this.plane.negate();
+    this.placePlane(line);
     this.clipWith(true);
     // The layers' own cut face shows only when they are cut; left whole, they show themselves.
     if (this.cut.layers) {
@@ -611,8 +634,16 @@ export class SiteScene {
     }
   }
 
-  // Each frame the cut's angle eases towards the wanted one and its faces follow once it has moved;
-  // the profile is sent at most once a PROFILE_MS.
+  // The cutting plane on a cut line, its kept side away from the camera.
+  placePlane(line) {
+    const [nx, ny] = line.normal;
+    const [fx, fy] = line.from;
+    this.plane.setFromNormalAndCoplanarPoint(new THREE.Vector3(nx, 0, -ny), new THREE.Vector3(fx, 0, -fy));
+    if (this.plane.distanceToPoint(this.camera.position) > 0) this.plane.negate();
+  }
+
+  // Each frame the cut's angle eases towards the wanted one: the plane turns with it, the faces
+  // follow once it has moved a degree, and the profile is sent once they have stood still.
   stepCut(now) {
     if (!this.cut) return;
     const { polar } = this.currentView();
@@ -629,14 +660,21 @@ export class SiteScene {
       this.cutActive = true;
       if (this.cutAngle == null || !this.cut.follow) this.cutAngle = this.wantedCutAngle();
       this.buildCut();
+      this.profileNow = true;
     } else {
       const gap = turnDegrees(this.cutAngle, this.wantedCutAngle());
-      if (Math.abs(gap) > 0.05) this.cutAngle = (this.cutAngle + gap * CUT_EASE + 360) % 360;
-      if (Math.abs(turnDegrees(this.builtAngle, this.cutAngle)) > CUT_REBUILD_DEGREES) this.buildCut();
+      if (Math.abs(gap) > 0.05) {
+        this.cutAngle = (this.cutAngle + gap * CUT_EASE + 360) % 360;
+        if (Math.abs(turnDegrees(this.builtAngle, this.cutAngle)) > CUT_REBUILD_DEGREES) this.buildCut();
+        else {
+          const { line } = this.cut.cutAt(this.cutAngle, false);
+          if (line) this.placePlane(line);
+        }
+      }
     }
-    if (this.profileDue && now - this.profileAt >= PROFILE_MS) {
+    if (this.profileDue && (this.profileNow || now - this.builtAt >= PROFILE_SETTLE_MS)) {
       this.profileDue = false;
-      this.profileAt = now;
+      this.profileNow = false;
       this.onCutSamples?.(this.cutSamples);
     }
   }
@@ -897,8 +935,9 @@ export class SiteScene {
     this.stepPeel();
     this.stepCut(now);
     if (this.cut && this.plane.distanceToPoint(this.camera.position) > 0) this.plane.negate();
-    if (this.pointer?.moved && !this.flight) {
+    if (this.pointer?.moved && !this.flight && !this.dragging && now - this.pickedAt >= PICK_MS) {
       this.pointer.moved = false;
+      this.pickedAt = now;
       const hit = this.pick(this.pointer.ndc);
       this.onHover?.(hit && { ...hit, clientX: this.pointer.x, clientY: this.pointer.y });
     }

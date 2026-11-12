@@ -22,6 +22,7 @@ import {
 } from './fields';
 import { cutLine, ringCentre } from './geo';
 import ProfilePanel from './ProfilePanel';
+import { signal, useSignal } from './signal';
 import { SiteScene, ZOOM_STEP } from './scene';
 import { terrainModel } from './terrain';
 import { basemapCanvas } from './tiles';
@@ -30,8 +31,8 @@ import './Site3D.css';
 const TEXTURE_CELLS = 320;
 const SURROUNDINGS_CELLS = 512;
 const BASEMAP_ZOOM = 19;
-// The surroundings' basemap: a coarse one first, which loads quickly, then a sharper one.
-const SURROUNDINGS_ZOOMS = [16, 17];
+// The surroundings' basemap zoom: about 1.6 m a pixel, 1600 px across, which uploads without a stall.
+const SURROUNDINGS_ZOOM = 16;
 // Metres of drop per 10 cm of depth when the scene opens.
 const DEFAULT_SPACING = 30;
 // The share in % of its colour the basemap keeps behind the layers, so it does not compete with them.
@@ -131,8 +132,17 @@ export function prepare(baseId, overlayIds) {
   const model = cachedModel();
   const layers = layersOf(baseId, overlayIds);
   cachedCanvas(layers, model.terrain.frame.mercatorBounds, BASEMAP_ZOOM);
-  cachedCanvas(layers, model.surroundings.terrain.frame.mercatorBounds, SURROUNDINGS_ZOOMS[0]);
+  cachedCanvas(layers, model.surroundings.terrain.frame.mercatorBounds, SURROUNDINGS_ZOOM);
+  const campaign = model.campaigns[model.campaigns.length - 1];
+  if (campaign) cachedRasters(model, campaign);
 }
+
+// The rasters by campaign: generated once, ahead of opening for the latest campaign.
+const rasterCache = new Map();
+const cachedRasters = (model, campaign) => {
+  if (!rasterCache.has(campaign.date)) rasterCache.set(campaign.date, campaignRasters(model, campaign));
+  return rasterCache.get(campaign.date);
+};
 
 // The generated rasters of one campaign: a field per depth through the probe readings, painted over the grid.
 function campaignRasters(model, campaign) {
@@ -181,6 +191,25 @@ function tooltipText(hover) {
   return hover.name;
 }
 
+function HoverTip({ hover }) {
+  const at = useSignal(hover);
+  if (!at) return null;
+  return (
+    <div className="site3d-tooltip" style={{ left: at.clientX, top: at.clientY }}>
+      {tooltipText(at)}
+    </div>
+  );
+}
+
+function CutProfile({ profile, colour, base }) {
+  const samples = useSignal(profile);
+  return samples ? <ProfilePanel samples={samples} colour={colour} base={base} /> : null;
+}
+
+function TiltNote({ profile }) {
+  return useSignal(profile) ? null : <p className="site3d-note">Tilt the view to see the section</p>;
+}
+
 const sliderSx = {
   color: theme.accent,
   py: '10px',
@@ -210,20 +239,22 @@ export default function Site3D() {
   const [cutAngle, setCutAngle] = useState(90);
   const [cutFollows, setCutFollows] = useState(true);
   const [cutLayers, setCutLayers] = useState(true);
-  const [profile, setProfile] = useState(null);
-  const [hover, setHover] = useState(null);
+  // Hovering and the cut's profile change often: they are signals, so only their own parts re-render.
+  const hover = useMemo(() => signal(null), []);
+  const profile = useMemo(() => signal(null), []);
 
   const campaign = model.campaigns.find(c => c.date === date) ?? model.campaigns[model.campaigns.length - 1];
-  const rasters = useMemo(() => campaignRasters(model, campaign), [model, campaign]);
+  const rasters = useMemo(() => cachedRasters(model, campaign), [model, campaign]);
 
   // The cut line at a direction in degrees, with the samples along the block for the layers' face
   // and the profile, and along the whole surroundings for the landscape's face.
   const cutAt = useMemo(() => {
     const { halfWidth, halfHeight } = model.terrain.frame;
     const { offset: [oe, on], halfWidth: aw, halfHeight: ah } = model.landscape;
-    return angle => {
+    // Without `full`, only the line: the scene turns its plane with it between rebuilds of the faces.
+    return (angle, full = true) => {
       const line = cutLine(model.centre, angle, cutOffset * model.reach, halfWidth, halfHeight);
-      if (!line) return { line: null };
+      if (!line || !full) return { line };
       const long = cutLine([model.centre[0] - oe, model.centre[1] - on], angle, cutOffset * model.reach, aw, ah);
       return {
         line,
@@ -271,33 +302,32 @@ export default function Site3D() {
       spacing: DEFAULT_SPACING,
       flat,
       autoTilt: view.autoTilt,
-      onHover: setHover,
+      onHover: hover.set,
       onPick: selectOption,
       onCompass,
-      onCutSamples: setProfile,
+      onCutSamples: profile.set,
     });
     site.show(site.topDownView(start.current.centre, start.current.height));
     scene.current = site;
     return () => site.dispose();
-  }, [model, selectOption]);
+  }, [model, selectOption, hover, profile]);
 
-  // The block's basemap and the coarse surroundings' first, then the sharper surroundings'.
+  // The block's and the surroundings' basemaps; once drawn, the shaders compile and the textures
+  // upload before the scene shows, so its first frames do not stall.
   useEffect(() => {
     let cancelled = false;
     const layers = layersOf(view.baseId, view.overlayIds);
     const draw = (bounds, zoom) => cachedCanvas(layers, bounds, zoom);
     const aroundBounds = model.surroundings.terrain.frame.mercatorBounds;
-    Promise.all([draw(model.terrain.frame.mercatorBounds, BASEMAP_ZOOM), draw(aroundBounds, SURROUNDINGS_ZOOMS[0])])
-      .then(([block, around]) => {
-        if (cancelled) return null;
+    Promise.all([draw(model.terrain.frame.mercatorBounds, BASEMAP_ZOOM), draw(aroundBounds, SURROUNDINGS_ZOOM)]).then(
+      ([block, around]) => {
+        if (cancelled) return;
         scene.current.setBasemap(block);
         scene.current.setSurroundingsBasemap(around);
+        scene.current.warm();
         setPhase(current => (current === 'loading' ? 'showing' : current));
-        return draw(aroundBounds, SURROUNDINGS_ZOOMS[1]);
-      })
-      .then(sharper => {
-        if (!cancelled && sharper) scene.current.setSurroundingsBasemap(sharper);
-      });
+      },
+    );
     return () => {
       cancelled = true;
     };
@@ -371,7 +401,7 @@ export default function Site3D() {
   useEffect(() => {
     if (view.mode !== 'leaving' || phase === 'returning' || phase === 'fading') return;
     setPhase('returning');
-    setHover(null);
+    hover.set(null);
     setCutOn(false);
     setGroundOn(true);
     const site = scene.current;
@@ -501,7 +531,7 @@ export default function Site3D() {
                 <input type="checkbox" checked={cutLayers} onChange={event => setCutLayers(event.target.checked)} />
                 <span>Cut the layers too</span>
               </label>
-              {!profile && <p className="site3d-note">Tilt the view to see the section</p>}
+              <TiltNote profile={profile} />
             </div>
           )}
           <hr className="map-card-separator" />
@@ -510,12 +540,8 @@ export default function Site3D() {
             {variable === 'redox' ? 'Slices generated from the probe readings' : 'The slices show redox'}
           </p>
         </div>
-        {cutOn && profile && <ProfilePanel samples={profile} colour={rasters.colour} base={model.terrain.base} />}
-        {hover && (
-          <div className="site3d-tooltip" style={{ left: hover.clientX, top: hover.clientY }}>
-            {tooltipText(hover)}
-          </div>
-        )}
+        {cutOn && <CutProfile profile={profile} colour={rasters.colour} base={model.terrain.base} />}
+        <HoverTip hover={hover} />
         <div className="site3d-nav" role="group" aria-label="Camera">
           <button
             type="button"
