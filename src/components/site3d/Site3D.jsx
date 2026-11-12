@@ -501,6 +501,7 @@ export default function Site3D() {
                 <input type="checkbox" checked={cutLayers} onChange={event => setCutLayers(event.target.checked)} />
                 <span>Cut the layers too</span>
               </label>
+              {!profile && <p className="site3d-note">Tilt the view to see the section</p>}
             </div>
           )}
           <hr className="map-card-separator" />

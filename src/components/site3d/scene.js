@@ -16,6 +16,9 @@ const LANDSCAPE_FLOOR = 40;
 // A following cut eases this share of the way to the view's heading each frame, its faces are
 // rebuilt once it has turned this many degrees, and the profile is sent at most this often.
 const CUT_EASE = 0.12;
+// The cut shows only on a tilted view: it turns on above the first tilt and off below the second, in radians.
+const CUT_ON_TILT = (10 * Math.PI) / 180;
+const CUT_OFF_TILT = (7 * Math.PI) / 180;
 const CUT_REBUILD_DEGREES = 0.25;
 const PROFILE_MS = 250;
 const FLY_MS = 1000;
@@ -179,6 +182,7 @@ export class SiteScene {
     this.onCompass = onCompass;
     this.onCutSamples = onCutSamples;
     this.cutAngle = null;
+    this.cutActive = false;
     this.profileAt = 0;
     this.profileDue = false;
     this.chosenSpacing = spacing;
@@ -428,7 +432,7 @@ export class SiteScene {
       const beads = DEPTHS.map((depth, k) => {
         const value = probe.values[k];
         const material = new THREE.MeshLambertMaterial({ color: channels(Number.isFinite(value) && this.colour(value)) });
-        material.clippingPlanes = this.cut?.layers ? [this.plane] : [];
+        material.clippingPlanes = this.cutActive && this.cut?.layers ? [this.plane] : [];
         const bead = new THREE.Mesh(this.probeBead, material);
         bead.userData = { kind: 'probe', name: probe.name, depth, value };
         return bead;
@@ -542,14 +546,14 @@ export class SiteScene {
    */
   setCut(cut) {
     this.cut = cut;
+    this.clearCut();
+    this.cutActive = false;
     if (!cut) {
-      this.clearCut();
       this.cutAngle = null;
       this.onCutSamples?.(null);
       return;
     }
-    if (this.cutAngle == null || !cut.follow) this.cutAngle = this.wantedCutAngle();
-    this.buildCut();
+    this.stepCut(performance.now());
   }
 
   wantedCutAngle() {
@@ -611,9 +615,25 @@ export class SiteScene {
   // the profile is sent at most once a PROFILE_MS.
   stepCut(now) {
     if (!this.cut) return;
-    const gap = turnDegrees(this.cutAngle, this.wantedCutAngle());
-    if (Math.abs(gap) > 0.05) this.cutAngle = (this.cutAngle + gap * CUT_EASE + 360) % 360;
-    if (Math.abs(turnDegrees(this.builtAngle, this.cutAngle)) > CUT_REBUILD_DEGREES) this.buildCut();
+    const { polar } = this.currentView();
+    if (polar <= (this.cutActive ? CUT_OFF_TILT : CUT_ON_TILT)) {
+      // Looking straight down there is no side to cut away: the cut waits for the view to tilt.
+      if (this.cutActive) {
+        this.clearCut();
+        this.cutActive = false;
+        this.cutAngle = null;
+        this.cutSamples = null;
+        this.profileDue = true;
+      }
+    } else if (!this.cutActive) {
+      this.cutActive = true;
+      if (this.cutAngle == null || !this.cut.follow) this.cutAngle = this.wantedCutAngle();
+      this.buildCut();
+    } else {
+      const gap = turnDegrees(this.cutAngle, this.wantedCutAngle());
+      if (Math.abs(gap) > 0.05) this.cutAngle = (this.cutAngle + gap * CUT_EASE + 360) % 360;
+      if (Math.abs(turnDegrees(this.builtAngle, this.cutAngle)) > CUT_REBUILD_DEGREES) this.buildCut();
+    }
     if (this.profileDue && now - this.profileAt >= PROFILE_MS) {
       this.profileDue = false;
       this.profileAt = now;
@@ -902,7 +922,7 @@ export class SiteScene {
     for (const hit of raycaster.intersectObjects(targets, false)) {
       const { kind } = hit.object.userData;
       const layered = kind === 'slice' || kind === 'probe' || hit.object.parent?.parent === this.probes;
-      const cutAway = layered ? this.cut?.layers : this.cut;
+      const cutAway = this.cutActive && (!layered || this.cut?.layers);
       if (cutAway && this.plane.distanceToPoint(hit.point) < 0) continue;
       const e = hit.point.x;
       const n = -hit.point.z;
