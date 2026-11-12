@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cutLine, densifyRing, insideRing, localFrame, ringCentre, viewCutAngle } from './geo';
+import { cutLine, densifyRing, innerPoint, insideRing, localFrame, ringCentre, viewCutAngle } from './geo';
 import { terrainModel } from './terrain';
 
 describe('localFrame', () => {
@@ -42,6 +42,19 @@ describe('rings', () => {
 
   it('finds the centre of the bounding box', () => {
     expect(ringCentre([[0, 0], [10, 2], [4, 8]])).toEqual([5, 4]);
+  });
+
+  it('takes the centre as the inner point when it lies inside', () => {
+    expect(innerPoint(ring)).toEqual([5, 5]);
+  });
+
+  it('moves the inner point into the ring when the centre falls outside it', () => {
+    // A U open to the north: the centre (5, 5) lies in the gap between the arms.
+    const u = [[0, 0], [10, 0], [10, 10], [7, 10], [7, 3], [3, 3], [3, 10], [0, 10]];
+    const point = innerPoint(u);
+    expect(insideRing(point, u)).toBe(true);
+    expect(point[1]).toBe(5);
+    expect(point[0]).toBeCloseTo(1.5);
   });
 });
 

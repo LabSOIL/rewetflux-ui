@@ -25,6 +25,7 @@ import ProfilePanel from './ProfilePanel';
 import { signal, useSignal } from './signal';
 import { SiteScene, ZOOM_STEP } from './scene';
 import { terrainModel } from './terrain';
+import { loadTower } from './tower';
 import { basemapCanvas } from './tiles';
 import './Site3D.css';
 
@@ -127,7 +128,7 @@ const cachedCanvas = (layers, bounds, zoom) => {
 };
 const layersOf = (baseId, overlayIds) => BASEMAP_LAYERS.filter(l => l.id === baseId || overlayIds.includes(l.id));
 
-/** Builds the site model and draws the basemaps the scene opens with, ahead of opening it. */
+/** Builds the site model, draws the basemaps the scene opens with and loads the tower, ahead of opening it. */
 export function prepare(baseId, overlayIds) {
   const model = cachedModel();
   const layers = layersOf(baseId, overlayIds);
@@ -135,6 +136,7 @@ export function prepare(baseId, overlayIds) {
   cachedCanvas(layers, model.surroundings.terrain.frame.mercatorBounds, SURROUNDINGS_ZOOM);
   const campaign = model.campaigns[model.campaigns.length - 1];
   if (campaign) cachedRasters(model, campaign);
+  loadTower();
 }
 
 // The rasters by campaign: generated once, ahead of opening for the latest campaign.
@@ -309,7 +311,14 @@ export default function Site3D() {
     });
     site.show(site.topDownView(start.current.centre, start.current.height));
     scene.current = site;
-    return () => site.dispose();
+    let disposed = false;
+    loadTower().then(geometry => {
+      if (geometry && !disposed) site.setTower(geometry);
+    });
+    return () => {
+      disposed = true;
+      site.dispose();
+    };
   }, [model, selectOption, hover, profile]);
 
   // The block's and the surroundings' basemaps; once drawn, the shaders compile and the textures

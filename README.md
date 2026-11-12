@@ -22,6 +22,15 @@ probe readings (inverse-distance weighting plus seeded noise), not measured rast
 python3 scripts/terrain.py
 ```
 
+`scripts/tower.py` writes the tower model, `src/data/tower.glb`, from its CAD STEP file: the parts
+under 50 mm are dropped and the rest meshed to its outline and joins, 2.5 m tall. The view stands it
+near the middle of the polygon, true to size close in and at least 96 px tall further out. It needs
+FreeCAD's Python modules:
+
+```bash
+python3 scripts/tower.py path/to/Tower.stp
+```
+
 ## Browser tests
 
 `yarn test` runs the unit tests in jsdom, which has no layout. The checks that need one run in

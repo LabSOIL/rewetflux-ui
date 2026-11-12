@@ -67,6 +67,29 @@ export function ringCentre(ring) {
 }
 
 /**
+ * A point inside the ring near its centre: the centre of its bounding box when that is inside, else
+ * the middle of the stretch inside the ring, along the line east-west through the centre, nearest to it.
+ */
+export function innerPoint(ring) {
+  const [cx, cy] = ringCentre(ring);
+  if (insideRing([cx, cy], ring)) return [cx, cy];
+  const crossings = [];
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    if (yi > cy !== yj > cy) crossings.push(((xj - xi) * (cy - yi)) / (yj - yi) + xi);
+  }
+  crossings.sort((a, b) => a - b);
+  let best = null;
+  for (let k = 0; k + 1 < crossings.length; k += 2) {
+    const [from, to] = [crossings[k], crossings[k + 1]];
+    const gap = Math.max(from - cx, cx - to, 0);
+    if (!best || gap < best.gap) best = { gap, x: (from + to) / 2 };
+  }
+  return best ? [best.x, cy] : [cx, cy];
+}
+
+/**
  * The direction in degrees, anticlockwise from east, of a cut line across the line of sight of a
  * camera at `azimuth` (radians, 0 looking north): its left normal points the way the camera looks.
  */

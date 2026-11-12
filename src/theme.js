@@ -58,9 +58,10 @@ export const theme = {
   backdropEdge: '#1c1f25',
   soilCut: '#5d4636',
   soilCutDeep: '#3b2c22',
-  // The ground before its basemap loads, the probes, and the light from below.
+  // The ground before its basemap loads, the probes, the tower, and the light from below.
   sceneBlank: '#cfcfcf',
   probe: '#eeeeee',
+  tower: '#22262d',
   groundLight: '#6b5a4a',
 };
 

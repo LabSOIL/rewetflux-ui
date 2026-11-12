@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { DEPTHS } from './fields';
-import { densifyRing, insideRing, ringCentre, viewCutAngle } from './geo';
+import { densifyRing, innerPoint, insideRing, ringCentre, viewCutAngle } from './geo';
+import { TOWER_HEIGHT, symbolScale } from './tower';
 import { theme } from '../../theme';
 
 // Scene axes: x east, y metres above the terrain base, z south.
@@ -11,6 +12,8 @@ const GROUND_SLAB = 3;
 const SLICE_SLAB = 1.2;
 const EDGE_STEP = 1.5;
 const PROBE_TOP = 8;
+// The tower is drawn true to size close in, and never less than this many pixels tall further out.
+const TOWER_MIN_PIXELS = 96;
 // How far below the lowest ground along a cut the landscape's cut face reaches, in metres.
 const LANDSCAPE_FLOOR = 40;
 // A following cut eases this share of the way to the view's heading each frame; its plane turns
@@ -261,6 +264,7 @@ export class SiteScene {
     this.reach = Math.max(...ring.map(([e, n]) => Math.hypot(e - this.centre[0], n - this.centre[1])));
     this.edge = densifyRing(ring, EDGE_STEP);
     this.eastmost = this.edge.reduce((a, p) => (p[0] > a[0] ? p : a));
+    this.towerAt = innerPoint(ring);
 
     this.buildGround(grid, coverage);
     this.buildSurroundings(surroundings);
@@ -359,6 +363,25 @@ export class SiteScene {
       return dot;
     });
     this.disposables.push(geometry);
+  }
+
+  /** Stands the tower, a geometry in metres with its foot at the origin, at a point inside the polygon near its centre. */
+  setTower(geometry) {
+    const material = this.track(new THREE.MeshLambertMaterial({ color: theme.tower }), 'basemap');
+    material.clippingPlanes = this.surface.material.clippingPlanes;
+    this.tower = new THREE.Mesh(geometry, material);
+    const [e, n] = this.towerAt;
+    this.tower.position.set(e, this.terrain.heightAt(e, n), -n);
+    this.tower.userData = { kind: 'tower', name: 'Tower' };
+    this.scene.add(this.tower);
+  }
+
+  // The tower keeps its minimum height on screen however far the camera is.
+  scaleTower() {
+    if (!this.tower) return;
+    const distance = this.camera.position.distanceTo(this.tower.position);
+    const viewport = this.container.clientHeight || 1;
+    this.tower.scale.setScalar(symbolScale(TOWER_HEIGHT, distance, FOV, viewport, TOWER_MIN_PIXELS));
   }
 
   canvasTexture(canvas) {
@@ -934,6 +957,7 @@ export class SiteScene {
     this.followTilt();
     this.stepPeel();
     this.stepCut(now);
+    this.scaleTower();
     if (this.cut && this.plane.distanceToPoint(this.camera.position) > 0) this.plane.negate();
     if (this.pointer?.moved && !this.flight && !this.dragging && now - this.pickedAt >= PICK_MS) {
       this.pointer.moved = false;
@@ -953,6 +977,7 @@ export class SiteScene {
     raycaster.setFromCamera(ndc, this.camera);
     const targets = [
       ...this.dots,
+      ...(this.tower ? [this.tower] : []),
       ...(this.probeParts ?? []).flatMap(p => p.beads),
       ...this.probes.children.map(g => g.children[1]),
       this.surface,
