@@ -148,3 +148,43 @@
     width: auto;
     display: block;
 }
+
+/* The 2D and 3D switch at the top of the map card */
+.view-switch {
+    display: flex;
+    margin-bottom: 10px;
+    border: 1px solid var(--panel-border);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.view-switch button {
+    flex: 1;
+    padding: 4px 10px;
+    border: none;
+    background: var(--button);
+    color: var(--text);
+    font: inherit;
+    cursor: pointer;
+}
+
+.view-switch button.selected {
+    background: var(--active);
+    color: var(--accent-text);
+    font-weight: 600;
+    cursor: default;
+}
+
+/* Under the 3D scene: a backdrop the map fades out to */
+.map-view {
+    background: radial-gradient(circle at 50% 40%, var(--backdrop), var(--backdrop-edge));
+}
+
+.map-view > .leaflet-container {
+    transition: opacity 0.8s ease;
+}
+
+.map-view.three-d > .leaflet-container {
+    opacity: 0;
+    pointer-events: none;
+}

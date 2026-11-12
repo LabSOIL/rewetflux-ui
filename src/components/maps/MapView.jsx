@@ -1,11 +1,14 @@
-import { useEffect } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { MapContainer, Pane, ScaleControl, ZoomControl, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { CatchmentLayers } from './Catchment';
 import MapLogos from './MapLogos';
 import { MAX_ZOOM } from './basemap';
 import { applySiteOpeningView, panelReach } from './siteOpeningView';
+import { useView } from '../../contexts/ViewContext';
 import './MapView.css';
+
+const Site3D = lazy(() => import('../site3d/Site3D'));
 
 function SiteOpeningView({ extent }) {
   const map = useMap();
@@ -29,8 +32,9 @@ export default function MapView({
   redoxMin,
   redoxMax,
 }) {
+  const view = useView();
   return (
-    <div className="map-view">
+    <div className={`map-view${view?.shown ? ' three-d' : ''}`}>
       <MapContainer
         bounds={extent}
         maxZoom={MAX_ZOOM}
@@ -56,6 +60,11 @@ export default function MapView({
           redoxMax={redoxMax}
         />
       </MapContainer>
+      {view && view.mode !== '2d' && (
+        <Suspense fallback={null}>
+          <Site3D />
+        </Suspense>
+      )}
       <MapLogos />
     </div>
   );

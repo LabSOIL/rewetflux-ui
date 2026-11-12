@@ -30,6 +30,7 @@
     "react-leaflet": "5.0.0",
     "react-leaflet-cluster": "^2.1.0",
     "react-router-dom": "7.14.2",
+    "three": "0.186.1",
     "uplot": "^1.6.32"
   },
   "devDependencies": {

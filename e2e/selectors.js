@@ -22,6 +22,13 @@ export const RAIL_POPUPS = ['Variable', 'Info'];
 export const DEPTH_GAUGE = '.depth-gauge';
 export const LOGO_IMAGES = '.map-logos img';
 export const MAP_CONTAINER = '.leaflet-container';
+export const SITE_3D = {
+    root: '.site3d',
+    canvas: '.site3d-canvas canvas',
+    card: '.site3d-card',
+    hint: '.site3d-hint',
+    profile: '.site3d-profile',
+};
 export const TILE_URL = /wmts20\.geo\.admin\.ch/;
 
 export const WINDOW_SIZES = [

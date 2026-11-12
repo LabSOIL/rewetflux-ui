@@ -6,6 +6,7 @@ import MapView from './components/maps/MapView';
 import BottomBar from './components/BottomBar';
 import { getArea, getLatestAt } from './data';
 import { SelectionProvider, useSelection } from './contexts/SelectionContext';
+import { ViewProvider } from './contexts/ViewContext';
 import { siteView } from './utils/siteView';
 
 // The map layer a selectable variable draws; the fluxes have no marker layer yet.
@@ -18,7 +19,9 @@ export default function App() {
   const sensors = useMemo(() => getArea()?.sensors ?? [], []);
   return (
     <SelectionProvider sensors={sensors}>
-      <SiteMap />
+      <ViewProvider>
+        <SiteMap />
+      </ViewProvider>
     </SelectionProvider>
   );
 }

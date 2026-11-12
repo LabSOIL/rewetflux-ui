@@ -24,15 +24,15 @@ export const BaseLayers = ({ baseId, overlayIds }) => (
     </>
 );
 
-/** The radio buttons for the bases and the checkboxes for the overlays. */
-export const BaseChooser = ({ baseId, overlayIds, onBase, onOverlay }) => (
+/** The radio buttons for the bases, grouped under `name`, and the checkboxes for the overlays. */
+export const BaseChooser = ({ baseId, overlayIds, onBase, onOverlay, name = 'basemap' }) => (
     <div className="map-card-layers">
         <div className="map-card-base">
             {BASES.map(layer => (
                 <label key={layer.id}>
                     <input
                         type="radio"
-                        name="basemap"
+                        name={name}
                         checked={layer.id === baseId}
                         onChange={() => onBase(layer.id)}
                     />

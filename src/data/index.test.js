@@ -203,6 +203,20 @@ describe('latest value per position', () => {
     expect(source.getLatestAt('unknown', 'redox', 5)).toBeNull();
   });
 
+  it('getRedoxProfiles gives each position its latest reading in the day range, by depth', () => {
+    expect(source.getRedoxProfiles('2025-09-01', '2025-09-15')).toEqual([
+      {
+        id: 'redox-two',
+        name: 'Two readings, later one listed first',
+        geom: pointGeom,
+        measured_on: '2025-09-10T08:00:00Z',
+        values: { 5: 100, 15: 0, 25: 0, 35: 110 },
+      },
+    ]);
+    expect(source.getRedoxProfiles('2025-09-01', '2025-09-30')[0].values[5]).toBe(220);
+    expect(source.getRedoxProfiles('2025-10-01', '2025-10-30')).toEqual([]);
+  });
+
   it('getLatest gives null for a position with no history and for an unknown position', () => {
     expect(source.getLatest('no-history', 'redox')).toBeNull();
     expect(source.getLatest('no-history', 'temperature')).toBeNull();

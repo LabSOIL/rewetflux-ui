@@ -53,6 +53,16 @@ export const theme = {
   soilDepth: '#a8855f',
   // The background of the rail's depth section: an earthy dark tone apart from the rail and the buttons.
   depthSection: '#45362a',
+  // The 3D scene: the backdrop the map fades out to, and the soil of a cut face, near the surface and deeper.
+  backdrop: '#3b414c',
+  backdropEdge: '#1c1f25',
+  soilCut: '#5d4636',
+  soilCutDeep: '#3b2c22',
+  // The ground before its basemap loads, the probes, the depth lines on a cut face, and the light from below.
+  sceneBlank: '#cfcfcf',
+  probe: '#eeeeee',
+  cutDepthLine: '#111111',
+  groundLight: '#6b5a4a',
 };
 
 /** Every text colour with the background it is drawn on; `large` marks text of 18.66px bold or 24px and up. */

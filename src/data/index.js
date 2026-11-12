@@ -112,6 +112,21 @@ export function createDataSource(document) {
     return sensor ? latestAtDepth(sensor, variable, depth) : null;
   };
 
+  // Each position's latest redox reading taken from one day to another (inclusive), as mV by depth in cm.
+  const redoxProfiles = (from, to) =>
+    sensors.flatMap(sensor => {
+      const rows = (sensor.redox_data ?? []).filter(r => {
+        const day = r.measured_on.slice(0, 10);
+        return day >= from && day <= to;
+      });
+      if (!rows.length) return [];
+      const reading = rows.reduce((a, r) => (Date.parse(r.measured_on) > Date.parse(a.measured_on) ? r : a));
+      const values = Object.fromEntries(
+        Object.entries(REDOX_CHANNELS).map(([depth, channel]) => [depth, reading[channel] ?? null]),
+      );
+      return [{ id: sensor.id, name: sensor.name, geom: sensor.geom, measured_on: reading.measured_on, values }];
+    });
+
   return {
     getArea() {
       if (!area) return null;
@@ -128,6 +143,7 @@ export function createDataSource(document) {
     getMoisture: tmsProfile,
     getLatest: latest,
     getLatestAt: latestAt,
+    getRedoxProfiles: redoxProfiles,
   };
 }
 
@@ -140,3 +156,4 @@ export const getTemperature = source.getTemperature;
 export const getMoisture = source.getMoisture;
 export const getLatest = source.getLatest;
 export const getLatestAt = source.getLatestAt;
+export const getRedoxProfiles = source.getRedoxProfiles;

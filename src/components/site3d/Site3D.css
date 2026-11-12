@@ -1,0 +1,152 @@
+/* The scene covers the map; it fades in over the map seen from above, which then fades out under it */
+.site3d {
+    position: absolute;
+    inset: 0;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.35s ease;
+}
+
+.site3d.visible {
+    opacity: 1;
+}
+
+.site3d-canvas {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+}
+
+.site3d-canvas canvas {
+    display: block;
+    touch-action: none;
+}
+
+.site3d-labels {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+}
+
+.site3d-label {
+    margin-left: 4px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--rail) 82%, transparent);
+    color: var(--text-strong);
+    font: 12px 'Barlow', sans-serif;
+    white-space: nowrap;
+}
+
+.site3d-label.selected {
+    color: var(--accent-text);
+    font-weight: 600;
+    box-shadow: inset 0 0 0 1px var(--accent-text);
+}
+
+.site3d-label-button {
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+.site3d-card {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 2;
+    box-sizing: border-box;
+    width: 210px;
+    max-width: none;
+    /* Clear of the logos, whose top is 167px up from the bottom, scrolling inside when taller */
+    max-height: calc(100% - 187px);
+    overflow-y: auto;
+    font-size: 12px;
+}
+
+.site3d-control-label {
+    display: flex;
+    justify-content: space-between;
+    color: var(--text);
+}
+
+.site3d-control-value {
+    color: var(--accent-text);
+}
+
+.map-card label.site3d-check {
+    margin-top: 2px;
+}
+
+.site3d-note {
+    margin: 8px 0 0;
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.site3d-hint {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 2;
+    max-width: 260px;
+    padding: 6px 10px;
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--panel) 88%, transparent);
+    color: var(--muted);
+    font-size: 12px;
+    pointer-events: none;
+}
+
+.site3d-tooltip {
+    position: absolute;
+    z-index: 3;
+    transform: translate(14px, -50%);
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: var(--panel);
+    box-shadow: 2px 2px 10px var(--shadow);
+    color: var(--text-strong);
+    font-size: 12px;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+/* Above the date bar (its top is 101px up), at the left of the map */
+.site3d-profile {
+    position: absolute;
+    left: 10px;
+    bottom: 115px;
+    z-index: 2;
+    padding: 8px 10px 4px;
+    border-radius: 5px;
+    background: var(--panel);
+    box-shadow: 2px 2px 10px var(--shadow);
+    color: var(--text);
+    font-size: 12px;
+}
+
+.site3d-profile canvas {
+    display: block;
+}
+
+.site3d-profile-note {
+    margin-left: 8px;
+    color: var(--muted);
+    font-size: 11px;
+}
+
+.site3d-attribution {
+    position: absolute;
+    right: 4px;
+    bottom: 2px;
+    z-index: 2;
+    padding: 1px 5px;
+    background: var(--panel);
+    color: var(--text);
+    font-size: 11px;
+}
+
+.site3d-attribution a {
+    color: var(--accent-text);
+}
