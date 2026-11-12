@@ -209,7 +209,7 @@ export default function Site3D() {
   const [cutOffset, setCutOffset] = useState(0);
   const [cutAngle, setCutAngle] = useState(90);
   const [cutFollows, setCutFollows] = useState(true);
-  const [cutLayers, setCutLayers] = useState(false);
+  const [cutLayers, setCutLayers] = useState(true);
   const [profile, setProfile] = useState(null);
   const [hover, setHover] = useState(null);
 
