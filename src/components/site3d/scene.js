@@ -19,9 +19,10 @@ const OBLIQUE = { polar: 0.9, azimuth: -0.38 };
 const SHADED = 0.8;
 // The tilt in radians at which the slices hang at their full spacing; they drop as the view tilts towards it.
 export const TILTED = 0.9;
-// A view tilted less than this, at rest, counts as flat and hands back to the map.
+// A view tilted less than this counts as flat, so handing back to the map needs no flight.
 const FLAT = 0.035;
-const SETTLE_MS = 300;
+// The slices sit this far above where they hang, so the top one lies on the ground without flickering into it.
+const SURFACE_LIFT = 0.3;
 // The camera's distance in metres, and the most tilt allowed: high close in, lower far out, so
 // the edge of the surroundings stays below the horizon.
 const MIN_DISTANCE = 30;
@@ -31,11 +32,10 @@ const TILT_FAR = { distance: 3000, tilt: 0.75 };
 // One step of the zoom buttons and of the keys, and the wheel's speed: about a quarter closer a notch.
 export const ZOOM_STEP = 1.4;
 const WHEEL_SPEED = 3;
-// Tilting as you zoom: from flat at the handover distance the view tilts fully by this share of
-// it, easing towards the tilt each frame; zooming out past the exit share hands back to the map.
+// Tilting as you zoom: from flat at the flat distance the view tilts fully by this share of it,
+// easing towards the tilt each frame.
 const TILT_SPAN = 0.5;
 const TILT_EASE = 0.35;
-const EXIT_SHARE = 1.12;
 const KEY_TURN = (5 * Math.PI) / 180;
 // Unselected slices are drawn at this share of their colour.
 const DIMMED = 0.5;
@@ -63,8 +63,9 @@ const maxTilt = distance =>
   lerp(TILT_NEAR.tilt, TILT_FAR.tilt, clamp01((distance - TILT_NEAR.distance) / (TILT_FAR.distance - TILT_NEAR.distance)));
 // A colour from 0 to 255 sRGB channels, or the no-data grey when there is no value.
 const channels = rgb => (rgb ? new THREE.Color().setRGB(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255, THREE.SRGBColorSpace) : MISSING.clone());
-// The vertical drop in metres below the ground of a depth in cm, at `spacing` metres per 10 cm.
-const drop = (spacing, depth) => (spacing * depth) / 10;
+// The vertical drop in metres below the ground of a depth's slice, at `spacing` metres per 10 cm:
+// the shallowest lies on the ground, each deeper one a step further down.
+const drop = (spacing, depth) => (spacing * (depth - DEPTHS[0])) / 10;
 
 function groundGeometry(terrain) {
   const { nx, ny, heights, eastOf, northOf } = terrain;
@@ -164,26 +165,22 @@ function makeLabel(text, onClick) {
  * through the set* methods.
  */
 export class SiteScene {
-  constructor(container, { terrain, ring, grid, coverage, positions, surroundings, spacing, handover, autoTilt, onHover, onPick, onFlat, onCompass }) {
+  constructor(container, { terrain, ring, grid, coverage, positions, surroundings, spacing, flat, autoTilt, onHover, onPick, onCompass }) {
     this.container = container;
     this.terrain = terrain;
     this.ring = ring;
     this.onHover = onHover;
     this.onPick = onPick;
-    this.onFlat = onFlat;
     this.onCompass = onCompass;
     this.chosenSpacing = spacing;
     this.spacing = 0;
     this.shade = 1;
     this.dragging = false;
-    this.settled = 0;
-    this.armed = false;
     this.steering = false;
     this.compass = null;
-    this.handover = handover;
+    this.flat = flat;
     this.autoTilt = autoTilt;
     this.manual = false;
-    this.near = false;
     this.autoPolar = null;
     this.flight = null;
     this.cut = null;
@@ -230,7 +227,6 @@ export class SiteScene {
     });
     this.controls.addEventListener('end', () => {
       this.dragging = false;
-      this.settled = performance.now();
     });
 
     for (const target of [this.scene, this.context]) {
@@ -288,10 +284,7 @@ export class SiteScene {
       lineGeometry(this.edge.map(([e, n]) => [e, heightAt(e, n) + 0.2, -n])),
       this.track(new THREE.LineBasicMaterial({ color: theme.white, transparent: true, opacity: 0.85 })),
     );
-    const [e, n] = this.eastmost;
-    const label = makeLabel('Ground');
-    label.position.set(e + 8, heightAt(e, n), -n);
-    this.groundParts = [this.surface, wall, outline, label];
+    this.groundParts = [this.surface, wall, outline];
     this.groundMaterials = [this.surface.material, wall.material];
     this.context.add(this.blockAround);
     this.scene.add(...this.groundParts);
@@ -492,18 +485,20 @@ export class SiteScene {
 
   layout() {
     const { spacing } = this;
+    // Flat, the deeper slices would lie in the top one, so only the top one shows until the view tilts.
     const shown = spacing > 0.3;
+    const showing = depth => depth === DEPTHS[0] || shown;
     for (const slice of this.slices) {
-      slice.group.position.y = -drop(spacing, slice.depth);
-      slice.group.visible = shown;
+      slice.group.position.y = SURFACE_LIFT - drop(spacing, slice.depth);
+      slice.group.visible = showing(slice.depth);
     }
     const bottom = -drop(spacing, DEPTHS[DEPTHS.length - 1]) - SLICE_SLAB;
     for (const { rod, beads } of this.probeParts ?? []) {
       rod.scale.y = PROBE_TOP - Math.min(bottom, -1);
       rod.position.y = (PROBE_TOP + Math.min(bottom, -1)) / 2;
       beads.forEach((bead, k) => {
-        bead.position.y = -drop(spacing, DEPTHS[k]);
-        bead.visible = shown;
+        bead.position.y = SURFACE_LIFT - drop(spacing, DEPTHS[k]);
+        bead.visible = showing(DEPTHS[k]);
       });
     }
     if (this.curtain) this.layoutCurtain();
@@ -617,7 +612,7 @@ export class SiteScene {
       group.add(mesh);
       return mesh;
     };
-    const soil = strip(() => true, () => SOIL, () => SOIL_DEEP);
+    const soil = strip(s => !s.inside, () => SOIL, () => SOIL_DEEP);
     const bands = DEPTHS.map((depth, k) => {
       const colourOf = s => channels(Number.isFinite(s.values[k]) && this.colour(s.values[k]));
       return { depth, mesh: strip(s => s.inside, colourOf, s => colourOf(s).multiplyScalar(0.7)) };
@@ -633,8 +628,6 @@ export class SiteScene {
     const { spacing } = this;
     const { grounds, soil, bands } = this.curtain;
     const shown = spacing > 0.3;
-    // The soil band stops short of the first slice, so the two never meet on the cut.
-    const soilDepth = shown ? Math.min(GROUND_SLAB, 0.5 * drop(spacing, DEPTHS[0])) : GROUND_SLAB;
     const place = (mesh, top, thickness) => {
       const positions = mesh.geometry.getAttribute('position');
       grounds.forEach((g, c) => {
@@ -644,10 +637,10 @@ export class SiteScene {
       positions.needsUpdate = true;
       mesh.geometry.computeBoundingSphere();
     };
-    place(soil, 0, soilDepth);
+    place(soil, 0, GROUND_SLAB);
     for (const { depth, mesh } of bands) {
-      place(mesh, drop(spacing, depth), SLICE_SLAB);
-      mesh.visible = shown;
+      place(mesh, drop(spacing, depth) - SURFACE_LIFT, SLICE_SLAB);
+      mesh.visible = depth === DEPTHS[0] || shown;
     }
   }
 
@@ -739,7 +732,6 @@ export class SiteScene {
     this.flight = null;
     this.controls.enabled = this.steering;
     this.controls.update();
-    this.settled = now;
     done?.();
   }
 
@@ -760,7 +752,6 @@ export class SiteScene {
       radius: Math.min(MAX_DISTANCE, Math.max(MIN_DISTANCE, view.radius * zoom)),
     });
     this.controls.update();
-    this.settled = performance.now();
   }
 
   /** Whether the view tilts as it zooms; off, only drags and keys tilt it. */
@@ -769,9 +760,9 @@ export class SiteScene {
     this.manual = false;
   }
 
-  /** The tilt that goes with a distance when tilting as you zoom: flat at the handover distance, full a span closer. */
+  /** The tilt that goes with a distance when tilting as you zoom: flat at the flat distance, full a span closer. */
   tiltFor(radius) {
-    return TILTED * smooth(clamp01((this.handover - radius) / (this.handover * (1 - TILT_SPAN))));
+    return TILTED * smooth(clamp01((this.flat - radius) / (this.flat * (1 - TILT_SPAN))));
   }
 
   /** Turns the view north up, keeping its tilt. */
@@ -779,9 +770,8 @@ export class SiteScene {
     if (this.steering && !this.flight) this.flyTo({ ...this.currentView(), azimuth: 0 }, null, 600);
   }
 
-  // The slices drop and the surroundings dim as the view tilts; a view tilted and then brought
-  // back flat, at rest, hands back to the map.
-  followTilt(now) {
+  // The slices drop and the surroundings dim as the view tilts; the compass follows the camera.
+  followTilt() {
     this.tiltWithZoom();
     const { radius, polar, azimuth } = this.currentView();
     this.controls.maxPolarAngle = maxTilt(radius);
@@ -790,13 +780,6 @@ export class SiteScene {
     if (Math.abs(spacing - this.spacing) > 0.01) this.setSpacing(spacing);
     const shade = lerp(1, SHADED, k);
     if (Math.abs(shade - this.shade) > 0.002) this.setShade(shade);
-    if (polar > 0.2) this.armed = true;
-    // Tilting as you zoom, a flat view is the map's own: only a view tilted by hand hands back by flattening.
-    const byHand = this.manual || !this.autoTilt;
-    if (byHand && this.armed && this.steering && !this.flight && !this.dragging && polar < FLAT && now - this.settled > SETTLE_MS) {
-      this.armed = false;
-      this.onFlat?.();
-    }
     if (!this.compass || Math.abs(this.compass[0] - azimuth) > 0.003 || Math.abs(this.compass[1] - polar) > 0.003) {
       this.compass = [azimuth, polar];
       this.onCompass?.(azimuth, polar);
@@ -804,7 +787,7 @@ export class SiteScene {
   }
 
   // While tilting as you zoom, the tilt eases towards the one for the distance, until the user
-  // tilts by hand; zooming back out past the handover distance hands back to the map.
+  // tilts by hand; zooming back out past the flat distance lets it follow the zoom again.
   tiltWithZoom() {
     if (!this.autoTilt || !this.steering || this.flight) return;
     const view = this.currentView();
@@ -812,13 +795,7 @@ export class SiteScene {
       if (this.autoPolar != null && Math.abs(view.polar - this.autoPolar) > 0.03) this.manual = true;
       return;
     }
-    if (view.radius > this.handover) this.manual = false;
-    if (view.radius < this.handover * 0.9) this.near = true;
-    if (!this.manual && this.near && view.radius > this.handover * EXIT_SHARE) {
-      this.near = false;
-      this.onFlat?.();
-      return;
-    }
+    if (view.radius > this.flat) this.manual = false;
     if (this.manual) return;
     const polar = view.polar + (this.tiltFor(view.radius) - view.polar) * TILT_EASE;
     this.applyView({ ...view, polar });
@@ -831,7 +808,7 @@ export class SiteScene {
     const now = performance.now();
     if (this.flight) this.stepFlight(now);
     else this.controls.update();
-    this.followTilt(now);
+    this.followTilt();
     this.stepPeel();
     if (this.cut && this.plane.distanceToPoint(this.camera.position) > 0) this.plane.negate();
     if (this.pointer?.moved && !this.flight) {

@@ -1,20 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import Slider from "@mui/material/Slider";
-import { getArea, getRedoxProfiles } from "../../data";
-import { getSurroundings, getTerrain } from "../../data/terrain";
-import { useSelection } from "../../contexts/SelectionContext";
-import {
-  HANDOVER_ZOOM,
-  metresPerPixel,
-  useView,
-} from "../../contexts/ViewContext";
-import { theme } from "../../theme";
-import { getColorScale } from "../../utils/colourMap";
-import { stops } from "../../utils/stops";
-import { BASEMAP_LAYERS } from "../maps/basemap";
-import { BaseChooser } from "../maps/Layers";
-import Legend from "../maps/Legend";
-import ViewSwitch from "../maps/ViewSwitch";
+import { useEffect, useMemo, useRef, useState } from 'react';
+import Slider from '@mui/material/Slider';
+import { getArea, getRedoxProfiles } from '../../data';
+import { getSurroundings, getTerrain } from '../../data/terrain';
+import { useSelection } from '../../contexts/SelectionContext';
+import { FLAT_ZOOM, metresPerPixel, useView } from '../../contexts/ViewContext';
+import { theme } from '../../theme';
+import { getColorScale } from '../../utils/colourMap';
+import { stops } from '../../utils/stops';
+import { BASEMAP_LAYERS } from '../maps/basemap';
+import { BaseChooser } from '../maps/Layers';
+import Legend from '../maps/Legend';
+import { RedoxLayersToggle } from '../maps/MapCard';
 import {
   DEPTHS,
   colourLookup,
@@ -24,13 +20,13 @@ import {
   paintField,
   readingRange,
   ringCoverage,
-} from "./fields";
-import { cutLine, ringCentre } from "./geo";
-import ProfilePanel from "./ProfilePanel";
-import { SiteScene, TILTED, ZOOM_STEP } from "./scene";
-import { terrainModel } from "./terrain";
-import { basemapCanvas } from "./tiles";
-import "./Site3D.css";
+} from './fields';
+import { cutLine, ringCentre } from './geo';
+import ProfilePanel from './ProfilePanel';
+import { SiteScene, ZOOM_STEP } from './scene';
+import { terrainModel } from './terrain';
+import { basemapCanvas } from './tiles';
+import './Site3D.css';
 
 const TEXTURE_CELLS = 320;
 const SURROUNDINGS_CELLS = 512;
@@ -46,11 +42,8 @@ const CUT_SAMPLES = 240;
 const LANDSCAPE_SAMPLES = 400;
 const SHOW_MS = 120;
 const FADE_MS = 200;
-const TILT_MS = 600;
 const FLATTEN_MS = 500;
 const FOV = 30;
-// How much closer the first scroll in from the map comes, as a factor on the distance.
-const ENTRY_STEP = 1.15;
 
 // The site in local metres: its ground, polygon, raster grid and the positions, from the built-in data.
 function siteModel() {
@@ -64,9 +57,9 @@ function siteModel() {
     halfWidth,
     halfHeight,
   };
-  const sensors = [...new Map(area.sensors.map((s) => [s.id, s])).values()];
-  const positions = sensors.map((s) => {
-    const [x, y] = toLocal(s.geom["4326"].x, s.geom["4326"].y);
+  const sensors = [...new Map(area.sensors.map(s => [s.id, s])).values()];
+  const positions = sensors.map(s => {
+    const [x, y] = toLocal(s.geom['4326'].x, s.geom['4326'].y);
     return { name: s.name, x, y };
   });
   const centre = ringCentre(ring);
@@ -87,12 +80,7 @@ function siteModel() {
     [1, 1],
     [-1, 1],
   ].map(([sx, sy]) =>
-    around.frame.toLocal(
-      ...terrain.frame.toLonLat(
-        sx * (halfWidth - inset),
-        sy * (halfHeight - inset),
-      ),
-    ),
+    around.frame.toLocal(...terrain.frame.toLonLat(sx * (halfWidth - inset), sy * (halfHeight - inset))),
   );
   return {
     terrain,
@@ -101,10 +89,8 @@ function siteModel() {
     coverage: ringCoverage(ring, grid),
     positions,
     centre,
-    reach: Math.max(
-      ...ring.map(([e, n]) => Math.hypot(e - centre[0], n - centre[1])),
-    ),
-    campaigns: stops("redox", { sensors }),
+    reach: Math.max(...ring.map(([e, n]) => Math.hypot(e - centre[0], n - centre[1]))),
+    campaigns: stops('redox', { sensors }),
     surroundings: {
       terrain: around,
       grid: aroundGrid,
@@ -120,10 +106,7 @@ function siteModel() {
     landscapeHeight: (e, n) =>
       Math.abs(e) <= halfWidth && Math.abs(n) <= halfHeight
         ? terrain.heightAt(e, n)
-        : around.heightAt(e - aroundOffset[0], n - aroundOffset[1]) +
-          around.base -
-          terrain.base -
-          1,
+        : around.heightAt(e - aroundOffset[0], n - aroundOffset[1]) + around.base - terrain.base - 1,
   };
 }
 
@@ -136,60 +119,45 @@ const cachedModel = () => {
 // Basemap canvases by layers, bounds and zoom: drawn once, whether ahead of time or on opening.
 const canvases = new Map();
 const cachedCanvas = (layers, bounds, zoom) => {
-  const key = `${layers.map((l) => l.id).join("+")}|${zoom}|${bounds.join(",")}`;
-  if (!canvases.has(key))
-    canvases.set(key, basemapCanvas(layers, bounds, zoom, theme.sceneBlank));
+  const key = `${layers.map(l => l.id).join('+')}|${zoom}|${bounds.join(',')}`;
+  if (!canvases.has(key)) canvases.set(key, basemapCanvas(layers, bounds, zoom, theme.sceneBlank));
   return canvases.get(key);
 };
-const layersOf = (baseId, overlayIds) =>
-  BASEMAP_LAYERS.filter((l) => l.id === baseId || overlayIds.includes(l.id));
+const layersOf = (baseId, overlayIds) => BASEMAP_LAYERS.filter(l => l.id === baseId || overlayIds.includes(l.id));
 
 /** Builds the site model and draws the basemaps the scene opens with, ahead of opening it. */
 export function prepare(baseId, overlayIds) {
   const model = cachedModel();
   const layers = layersOf(baseId, overlayIds);
   cachedCanvas(layers, model.terrain.frame.mercatorBounds, BASEMAP_ZOOM);
-  cachedCanvas(
-    layers,
-    model.surroundings.terrain.frame.mercatorBounds,
-    SURROUNDINGS_ZOOMS[0],
-  );
+  cachedCanvas(layers, model.surroundings.terrain.frame.mercatorBounds, SURROUNDINGS_ZOOMS[0]);
 }
 
 // The generated rasters of one campaign: a field per depth through the probe readings, painted over the grid.
 function campaignRasters(model, campaign) {
   const { toLocal } = model.terrain.frame;
-  const probes = getRedoxProfiles(campaign.date, campaign.until).map((p) => {
-    const [x, y] = toLocal(p.geom["4326"].x, p.geom["4326"].y);
-    return { name: p.name, x, y, values: DEPTHS.map((d) => p.values[d]) };
+  const probes = getRedoxProfiles(campaign.date, campaign.until).map(p => {
+    const [x, y] = toLocal(p.geom['4326'].x, p.geom['4326'].y);
+    return { name: p.name, x, y, values: DEPTHS.map(d => p.values[d]) };
   });
   const range = readingRange(probes) ?? { min: -1, max: 1 };
-  const scale = getColorScale("redox", range.min, range.max);
-  const colour = colourLookup(
-    (value) => hexChannels(scale(value).hex()),
-    range.min,
-    range.max,
-  );
-  const fields = DEPTHS.map((_, k) =>
-    depthField(probes, k, NOISE_SHARE * (range.max - range.min), NOISE_SEED),
-  );
+  const scale = getColorScale('redox', range.min, range.max);
+  const colour = colourLookup(value => hexChannels(scale(value).hex()), range.min, range.max);
+  const fields = DEPTHS.map((_, k) => depthField(probes, k, NOISE_SHARE * (range.max - range.min), NOISE_SEED));
   return {
     probes,
     fields,
     colour,
     range,
     scale,
-    rasters: fields.map((field) =>
-      paintField(field, model.coverage, model.grid, colour),
-    ),
+    rasters: fields.map(field => paintField(field, model.coverage, model.grid, colour)),
   };
 }
 
 // The 2D map's view in local metres: its centre and the ground it spans north to south.
 function mapView(model, from) {
   const { toLocal } = model.terrain.frame;
-  if (!from?.centre)
-    return { centre: model.centre, height: 2 * model.terrain.frame.halfHeight };
+  if (!from?.centre) return { centre: model.centre, height: 2 * model.terrain.frame.halfHeight };
   const [lat, lng] = from.centre;
   return {
     centre: toLocal(lng, lat),
@@ -198,25 +166,25 @@ function mapView(model, from) {
 }
 
 function tooltipText(hover) {
-  if (hover.kind === "slice") {
+  if (hover.kind === 'slice') {
     return Number.isFinite(hover.value)
       ? `${hover.depth} cm: ${Math.round(hover.value)} mV (generated)`
       : `${hover.depth} cm: no data`;
   }
-  if (hover.kind === "probe") {
+  if (hover.kind === 'probe') {
     return Number.isFinite(hover.value)
       ? `${hover.name}, ${hover.depth} cm: ${Math.round(hover.value)} mV`
       : `${hover.name}, ${hover.depth} cm: no reading`;
   }
-  if (hover.kind === "ground") return `Ground ${hover.elevation.toFixed(1)} m`;
+  if (hover.kind === 'ground') return `Ground ${hover.elevation.toFixed(1)} m`;
   return hover.name;
 }
 
 const sliderSx = {
   color: theme.accent,
-  py: "10px",
-  "& .MuiSlider-thumb:hover, & .MuiSlider-thumb.Mui-focusVisible": {
-    boxShadow: "none",
+  py: '10px',
+  '& .MuiSlider-thumb:hover, & .MuiSlider-thumb.Mui-focusVisible': {
+    boxShadow: 'none',
   },
 };
 
@@ -226,13 +194,12 @@ const sliderSx = {
  */
 export default function Site3D() {
   const view = useView();
-  const { variable, option, date, selectVariable, selectOption } =
-    useSelection();
+  const { variable, option, date, selectVariable, selectOption } = useSelection();
   const model = useMemo(cachedModel, []);
   const holder = useRef(null);
   const scene = useRef(null);
   const start = useRef(mapView(model, view.from));
-  const [phase, setPhase] = useState("loading");
+  const [phase, setPhase] = useState('loading');
   const [spacing, setSpacing] = useState(DEFAULT_SPACING);
   const [groundOn, setGroundOn] = useState(true);
   const [peel, setPeel] = useState(false);
@@ -241,24 +208,13 @@ export default function Site3D() {
   const [cutAngle, setCutAngle] = useState(90);
   const [hover, setHover] = useState(null);
 
-  const campaign =
-    model.campaigns.find((c) => c.date === date) ??
-    model.campaigns[model.campaigns.length - 1];
-  const rasters = useMemo(
-    () => campaignRasters(model, campaign),
-    [model, campaign],
-  );
+  const campaign = model.campaigns.find(c => c.date === date) ?? model.campaigns[model.campaigns.length - 1];
+  const rasters = useMemo(() => campaignRasters(model, campaign), [model, campaign]);
 
   const samples = useMemo(() => {
     if (!cutOn) return null;
     const { halfWidth, halfHeight } = model.terrain.frame;
-    const line = cutLine(
-      model.centre,
-      cutAngle,
-      cutOffset * model.reach,
-      halfWidth,
-      halfHeight,
-    );
+    const line = cutLine(model.centre, cutAngle, cutOffset * model.reach, halfWidth, halfHeight);
     if (!line) return null;
     // The same line, run across the whole surroundings.
     const {
@@ -266,13 +222,7 @@ export default function Site3D() {
       halfWidth: aw,
       halfHeight: ah,
     } = model.landscape;
-    const long = cutLine(
-      [model.centre[0] - oe, model.centre[1] - on],
-      cutAngle,
-      cutOffset * model.reach,
-      aw,
-      ah,
-    );
+    const long = cutLine([model.centre[0] - oe, model.centre[1] - on], cutAngle, cutOffset * model.reach, aw, ah);
     return {
       line,
       landscape:
@@ -301,36 +251,31 @@ export default function Site3D() {
   useEffect(() => {
     if (entered.current) return;
     entered.current = true;
-    if (variable !== "redox") selectVariable("redox");
+    if (variable !== 'redox') selectVariable('redox');
   }, [variable, selectVariable]);
 
   const needle = useRef(null);
-  const { leave3D } = view;
   useEffect(() => {
     const onCompass = (azimuth, polar) => {
-      if (needle.current)
-        needle.current.style.transform = `rotateX(${polar}rad) rotateZ(${azimuth}rad)`;
+      if (needle.current) needle.current.style.transform = `rotateX(${polar}rad) rotateZ(${azimuth}rad)`;
     };
-    // The distance at which the scene shows what the map shows at the handover zoom.
+    // The distance at which the scene shows the ground at the map's scale at the flat zoom.
     const lat = model.terrain.frame.toLonLat(...model.centre)[1];
-    const handover =
-      (metresPerPixel(HANDOVER_ZOOM, lat) * holder.current.clientHeight) /
-      2 /
-      Math.tan((FOV / 2) * (Math.PI / 180));
+    const flat =
+      (metresPerPixel(FLAT_ZOOM, lat) * holder.current.clientHeight) / 2 / Math.tan((FOV / 2) * (Math.PI / 180));
     const site = new SiteScene(holder.current, {
       ...model,
       spacing: DEFAULT_SPACING,
-      handover,
+      flat,
       autoTilt: view.autoTilt,
       onHover: setHover,
       onPick: selectOption,
-      onFlat: leave3D,
       onCompass,
     });
     site.show(site.topDownView(start.current.centre, start.current.height));
     scene.current = site;
     return () => site.dispose();
-  }, [model, selectOption, leave3D]);
+  }, [model, selectOption]);
 
   // The block's basemap and the coarse surroundings' first, then the sharper surroundings'.
   useEffect(() => {
@@ -338,20 +283,16 @@ export default function Site3D() {
     const layers = layersOf(view.baseId, view.overlayIds);
     const draw = (bounds, zoom) => cachedCanvas(layers, bounds, zoom);
     const aroundBounds = model.surroundings.terrain.frame.mercatorBounds;
-    Promise.all([
-      draw(model.terrain.frame.mercatorBounds, BASEMAP_ZOOM),
-      draw(aroundBounds, SURROUNDINGS_ZOOMS[0]),
-    ])
+    Promise.all([draw(model.terrain.frame.mercatorBounds, BASEMAP_ZOOM), draw(aroundBounds, SURROUNDINGS_ZOOMS[0])])
       .then(([block, around]) => {
         if (cancelled) return null;
         scene.current.setBasemap(block);
         scene.current.setSurroundingsBasemap(around);
-        setPhase((current) => (current === "loading" ? "showing" : current));
+        setPhase(current => (current === 'loading' ? 'showing' : current));
         return draw(aroundBounds, SURROUNDINGS_ZOOMS[1]);
       })
-      .then((sharper) => {
-        if (!cancelled && sharper)
-          scene.current.setSurroundingsBasemap(sharper);
+      .then(sharper => {
+        if (!cancelled && sharper) scene.current.setSurroundingsBasemap(sharper);
       });
     return () => {
       cancelled = true;
@@ -363,7 +304,7 @@ export default function Site3D() {
   }, [rasters, model]);
 
   useEffect(() => {
-    scene.current.setSelectedDepth(variable === "redox" ? option : null);
+    scene.current.setSelectedDepth(variable === 'redox' ? option : null);
   }, [variable, option]);
 
   // Picking a depth, on the rail or on a slice, peels the layers above it away.
@@ -400,30 +341,25 @@ export default function Site3D() {
   }, [view.autoTilt]);
 
   useEffect(() => {
-    if (phase === "showing") {
+    if (phase === 'showing') {
       const timer = setTimeout(() => {
         const site = scene.current;
         view.setShown(true);
-        setPhase("flying");
+        setPhase('flying');
         const opened = () => {
           site.setSteering(true);
-          setPhase("open");
+          setPhase('open');
         };
-        // Opening the site: the oblique view at once; scrolling in: the zoom carries on and the tilt
-        // follows it; tilting the map: it tilts in place; the switch: it flies to the oblique view.
-        if (view.from?.via === "start") {
+        // From the map, it flies from above to the oblique view; opened by a link, it starts there.
+        if (view.from) site.flyTo(site.obliqueView(), opened);
+        else {
           site.show(site.obliqueView());
           opened();
-        } else if (view.from?.via === "zoom") {
-          opened();
-          site.nudge({ zoom: 1 / ENTRY_STEP });
-        } else if (view.from?.via === "tilt")
-          site.flyTo(site.tiltedView(TILTED), opened, TILT_MS);
-        else site.flyTo(site.obliqueView(), opened);
+        }
       }, SHOW_MS);
       return () => clearTimeout(timer);
     }
-    if (phase === "fading") {
+    if (phase === 'fading') {
       const timer = setTimeout(view.closed, FADE_MS);
       return () => clearTimeout(timer);
     }
@@ -431,9 +367,8 @@ export default function Site3D() {
   }, [phase, view]);
 
   useEffect(() => {
-    if (view.mode !== "leaving" || phase === "returning" || phase === "fading")
-      return;
-    setPhase("returning");
+    if (view.mode !== 'leaving' || phase === 'returning' || phase === 'fading') return;
+    setPhase('returning');
     setHover(null);
     setCutOn(false);
     setGroundOn(true);
@@ -441,17 +376,17 @@ export default function Site3D() {
     site.setSteering(false);
     // The map takes over where the scene looks, once it is flat and north up.
     const back = () => {
-      if (phase !== "loading") view.setReturnTo(site.groundView());
+      if (phase !== 'loading') view.setReturnTo(site.groundView());
       view.setShown(false);
-      setPhase("fading");
+      setPhase('fading');
     };
-    if (phase === "loading" || site.isFlat()) back();
+    if (phase === 'loading' || site.isFlat()) back();
     else site.flyTo(site.flatView(), back, FLATTEN_MS);
   }, [view, phase]);
 
-  const visible = phase !== "loading" && phase !== "fading";
+  const visible = phase !== 'loading' && phase !== 'fading';
   const legend = {
-    title: "Redox [mV]",
+    title: 'Redox [mV]',
     colorScale: rasters.scale,
     minVal: Math.round(rasters.range.min),
     maxVal: Math.round(rasters.range.max),
@@ -459,20 +394,17 @@ export default function Site3D() {
 
   return (
     <>
-      {phase === "loading" && (
-        <div className="site3d-loading">Loading the 3D view</div>
-      )}
-      <div className={`site3d${visible ? " visible" : ""}`}>
+      {phase === 'loading' && <div className="site3d-loading">Loading the 3D view</div>}
+      <div className={`site3d${visible ? ' visible' : ''}`}>
         <div className="site3d-canvas" ref={holder} />
-        {phase === "open" && (
+        {phase === 'open' && (
           <div className="site3d-hint">
-            Scroll to zoom, drag to move, right-drag or Shift-drag to turn and
-            tilt. Zoom out, or tilt back to flat, to return to the map. Click a
-            slice to pick its depth.
+            Scroll to zoom, drag to move, right-drag or Shift-drag to turn and tilt. Click a slice to pick its depth.
+            Untick the redox layers to return to the map.
           </div>
         )}
         <div className="map-card site3d-card">
-          <ViewSwitch mode="3d" onChange={view.leave3D} />
+          <RedoxLayersToggle on={view.mode === '3d'} onChange={view.leave3D} />
           <BaseChooser
             name="basemap-3d"
             baseId={view.baseId}
@@ -483,7 +415,7 @@ export default function Site3D() {
           <hr className="map-card-separator" />
           <div className="site3d-control">
             <div className="site3d-control-label">
-              <span>Depth spacing</span>
+              <span>Layer spacing</span>
               <span className="site3d-control-value">×{spacing * 10}</span>
             </div>
             <Slider
@@ -491,42 +423,26 @@ export default function Site3D() {
               min={2}
               max={60}
               value={spacing}
-              disabled={phase !== "open"}
+              disabled={phase !== 'open'}
               onChange={(_, value) => setSpacing(value)}
-              aria-label="Depth spacing"
+              aria-label="Layer spacing"
               sx={sliderSx}
             />
           </div>
           <label className="site3d-check">
-            <input
-              type="checkbox"
-              checked={view.autoTilt}
-              onChange={(event) => view.setAutoTilt(event.target.checked)}
-            />
+            <input type="checkbox" checked={view.autoTilt} onChange={event => view.setAutoTilt(event.target.checked)} />
             <span>Tilt as you zoom</span>
           </label>
           <label className="site3d-check">
-            <input
-              type="checkbox"
-              checked={groundOn}
-              onChange={(event) => setGroundOn(event.target.checked)}
-            />
+            <input type="checkbox" checked={groundOn} onChange={event => setGroundOn(event.target.checked)} />
             <span>Ground</span>
           </label>
           <label className="site3d-check">
-            <input
-              type="checkbox"
-              checked={peel}
-              onChange={(event) => setPeel(event.target.checked)}
-            />
+            <input type="checkbox" checked={peel} onChange={event => setPeel(event.target.checked)} />
             <span>Peel layers above the depth</span>
           </label>
           <label className="site3d-check">
-            <input
-              type="checkbox"
-              checked={cutOn}
-              onChange={(event) => setCutOn(event.target.checked)}
-            />
+            <input type="checkbox" checked={cutOn} onChange={event => setCutOn(event.target.checked)} />
             <span>Cross-section</span>
           </label>
           {cutOn && (
@@ -562,23 +478,12 @@ export default function Site3D() {
           <hr className="map-card-separator" />
           <Legend {...legend} />
           <p className="site3d-note">
-            {variable === "redox"
-              ? "Slices generated from the probe readings"
-              : "The slices show redox"}
+            {variable === 'redox' ? 'Slices generated from the probe readings' : 'The slices show redox'}
           </p>
         </div>
-        {samples && (
-          <ProfilePanel
-            samples={samples.points}
-            colour={rasters.colour}
-            base={model.terrain.base}
-          />
-        )}
+        {samples && <ProfilePanel samples={samples.points} colour={rasters.colour} base={model.terrain.base} />}
         {hover && (
-          <div
-            className="site3d-tooltip"
-            style={{ left: hover.clientX, top: hover.clientY }}
-          >
+          <div className="site3d-tooltip" style={{ left: hover.clientX, top: hover.clientY }}>
             {tooltipText(hover)}
           </div>
         )}
@@ -599,33 +504,16 @@ export default function Site3D() {
           >
             −
           </button>
-          <button
-            type="button"
-            aria-label="Face north"
-            title="Face north"
-            onClick={() => scene.current.faceNorth()}
-          >
-            <svg
-              ref={needle}
-              className="site3d-compass"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
+          <button type="button" aria-label="Face north" title="Face north" onClick={() => scene.current.faceNorth()}>
+            <svg ref={needle} className="site3d-compass" viewBox="0 0 24 24" aria-hidden="true">
               <path className="site3d-compass-north" d="M12 2 L16 12 L8 12 Z" />
-              <path
-                className="site3d-compass-south"
-                d="M12 22 L16 12 L8 12 Z"
-              />
+              <path className="site3d-compass-south" d="M12 22 L16 12 L8 12 Z" />
             </svg>
           </button>
         </div>
         <div className="site3d-attribution">
-          Terrain and basemap &copy;{" "}
-          <a
-            href="https://www.swisstopo.admin.ch/"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
+          Terrain and basemap &copy;{' '}
+          <a href="https://www.swisstopo.admin.ch/" target="_blank" rel="noopener noreferrer">
             swisstopo
           </a>
         </div>

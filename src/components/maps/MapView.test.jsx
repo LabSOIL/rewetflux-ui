@@ -78,10 +78,10 @@ describe('MapView', () => {
 
   it('switches the base layer with the radio buttons', async () => {
     const radios = [...container.querySelectorAll('.map-card-base input[type="radio"]')];
-    expect(radios.map(r => r.checked)).toEqual([true, false]);
-    await act(async () => radios[1].click());
+    expect(radios.map(r => r.checked)).toEqual([false, true]);
+    await act(async () => radios[0].click());
     expect([...container.querySelectorAll('.map-card-base input[type="radio"]')].map(r => r.checked))
-      .toEqual([false, true]);
+      .toEqual([true, false]);
   });
 
   it('shows the funder logos as links in one overlay beside the map, outside the leaflet container', () => {

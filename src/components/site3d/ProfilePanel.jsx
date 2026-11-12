@@ -30,6 +30,8 @@ function draw(canvas, samples, colour, base) {
   const x = distance => MARGIN.left + (distance / length) * plotWidth;
   const y = ground => MARGIN.top + (high - ground) * perMetre;
   const deepest = DEPTHS[DEPTHS.length - 1];
+  // A depth's band centre under the ground line: the shallowest band lies on the ground, the deepest ends the column.
+  const below = depth => BAND / 2 + ((depth - DEPTHS[0]) / (deepest - DEPTHS[0])) * (COLUMN - BAND);
 
   // Under each pixel column, from the nearest sample: a soil band under the ground and, inside the
   // polygon, a thin band at each depth in that depth's colour, the gaps between them left open.
@@ -45,10 +47,12 @@ function draw(canvas, samples, colour, base) {
   for (let px = 0; px < pixels.width; px++) {
     const s = samples[Math.round((px / (pixels.width - 1)) * (samples.length - 1))];
     const top = Math.round((y(s.ground) - MARGIN.top) * ratio);
-    paint(px, top, Math.round(SOIL_BAND * ratio), soil);
-    if (!s.inside) continue;
+    if (!s.inside) {
+      paint(px, top, Math.round(SOIL_BAND * ratio), soil);
+      continue;
+    }
     DEPTHS.forEach((depth, k) => {
-      const centre = top + Math.round((depth / deepest) * COLUMN * ratio);
+      const centre = top + Math.round(below(depth) * ratio);
       paint(px, centre - Math.floor(band / 2), band, Number.isFinite(s.values[k]) ? colour(s.values[k]) : missing);
     });
   }
@@ -84,13 +88,13 @@ function draw(canvas, samples, colour, base) {
   context.textAlign = 'left';
   context.textBaseline = 'middle';
   for (const depth of DEPTHS) {
-    const ty = keyTop + (depth / deepest) * COLUMN;
+    const ty = keyTop + below(depth);
     context.moveTo(keyX, ty);
     context.lineTo(keyX + 4, ty);
   }
   context.stroke();
-  context.fillText('5', keyX + 7, keyTop + (5 / deepest) * COLUMN);
-  context.fillText('35 cm', keyX + 7, keyTop + COLUMN);
+  context.fillText(`${DEPTHS[0]}`, keyX + 7, keyTop + below(DEPTHS[0]));
+  context.fillText(`${deepest} cm`, keyX + 7, keyTop + below(deepest));
   // The column is drawn COLUMN px deep for the deepest slice; the ground at `perMetre` px per m.
   return Math.round(COLUMN / (deepest / 100) / perMetre);
 }

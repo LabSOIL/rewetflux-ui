@@ -1,9 +1,11 @@
 import { test, expect } from '@playwright/test';
-import { MAP_CONTAINER, PANELS, SITE_3D, TILE_URL, WINDOW_SIZES } from './selectors.js';
-import { TILE_COLOUR, flatTile, openSite, overlaps } from './support.js';
+import { MAP_CONTAINER, PANELS, SITE_3D, WINDOW_SIZES } from './selectors.js';
+import { openSite, overlaps } from './support.js';
+
+const REDOX_LAYERS = 'Redox layers (3D)';
 
 const open3D = async page => {
-    await page.locator(PANELS.card).getByRole('radio', { name: '3D' }).click();
+    await page.locator(PANELS.card).getByLabel(REDOX_LAYERS).check();
     await page.locator(SITE_3D.hint).waitFor();
 };
 
@@ -37,7 +39,7 @@ for (const size of WINDOW_SIZES.slice(0, 2)) {
     });
 }
 
-test('the 3D view draws the scene over the map and hands back to the map', async ({ browser }) => {
+test('ticking the redox layers draws them in 3D over the map, and unticking them hands back to the map', async ({ browser }) => {
     const page = await openSite(browser, WINDOW_SIZES[0]);
     await open3D(page);
     const canvas = await page.locator(SITE_3D.canvas).boundingBox();
@@ -45,54 +47,15 @@ test('the 3D view draws the scene over the map and hands back to the map', async
     for (const side of ['x', 'y', 'width', 'height']) expect(Math.abs(canvas[side] - map[side]), side).toBeLessThan(1);
     await expect(page.locator(MAP_CONTAINER)).toHaveCSS('opacity', '0');
 
-    await page.locator(SITE_3D.card).getByRole('radio', { name: '2D' }).click();
+    await page.locator(SITE_3D.card).getByLabel(REDOX_LAYERS).uncheck();
     await page.locator(SITE_3D.root).waitFor({ state: 'detached' });
     await expect(page.locator(MAP_CONTAINER)).toHaveCSS('opacity', '1');
     await page.close();
 });
 
-const scrollOutTo2D = async page => {
-    const map = await page.locator(MAP_CONTAINER).boundingBox();
-    await page.mouse.move(map.x + map.width / 2, map.y + map.height / 2);
-    for (let i = 0; i < 12 && (await page.locator(SITE_3D.root).count()); i++) {
-        await page.mouse.wheel(0, 100);
-        await page.waitForTimeout(150);
-    }
-    await page.locator(SITE_3D.root).waitFor({ state: 'detached' });
-    await expect(page.locator(MAP_CONTAINER)).toHaveCSS('opacity', '1');
-};
-
-test('the site opens in 3D, and zooming out hands it to the map', async ({ browser }) => {
-    const page = await browser.newPage({ viewport: WINDOW_SIZES[0] });
-    await page.route(TILE_URL, route => route.fulfill({ contentType: 'image/png', body: flatTile(TILE_COLOUR) }));
-    await page.goto('/');
-    await page.locator(SITE_3D.hint).waitFor();
-    await expect(page.locator(MAP_CONTAINER)).toHaveCSS('opacity', '0');
-    await scrollOutTo2D(page);
-    await page.close();
-});
-
-test('scrolling in on the site carries the map on into 3D, and scrolling out hands it back', async ({ browser }) => {
+test('the site opens on the 2D map, on the aerial basemap', async ({ browser }) => {
     const page = await openSite(browser, WINDOW_SIZES[0]);
-    const map = await page.locator(MAP_CONTAINER).boundingBox();
-    await page.mouse.move(map.x + map.width / 2, map.y + map.height / 2);
-    for (let i = 0; i < 4 && !(await page.locator(SITE_3D.root).count()); i++) {
-        await page.mouse.wheel(0, -100);
-        await page.waitForTimeout(400);
-    }
-    await page.locator(SITE_3D.hint).waitFor();
-    await expect(page.locator(MAP_CONTAINER)).toHaveCSS('opacity', '0');
-    await scrollOutTo2D(page);
-    await page.close();
-});
-
-test('right-dragging up on the map tilts it into 3D', async ({ browser }) => {
-    const page = await openSite(browser, WINDOW_SIZES[0]);
-    const map = await page.locator(MAP_CONTAINER).boundingBox();
-    await page.mouse.move(map.x + map.width / 2, map.y + map.height / 2);
-    await page.mouse.down({ button: 'right' });
-    await page.mouse.move(map.x + map.width / 2, map.y + map.height / 2 - 80, { steps: 8 });
-    await page.mouse.up({ button: 'right' });
-    await page.locator(SITE_3D.hint).waitFor();
+    await expect(page.locator(SITE_3D.root)).toHaveCount(0);
+    await expect(page.locator(PANELS.card).getByLabel('Aerial')).toBeChecked();
     await page.close();
 });

@@ -5,12 +5,19 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { BaseChooser, BaseLayers, DEFAULT_BASEMAP_ID } from './Layers';
 import Legend from './Legend';
-import ViewSwitch from './ViewSwitch';
 import { mapViewOf, useView } from '../../contexts/ViewContext';
 import './MapView.css';
 
+/** The checkbox for the redox layers at four depths: they show in 3D, so ticking it opens the 3D view and unticking it leaves. */
+export const RedoxLayersToggle = ({ on, onChange }) => (
+  <label className="map-card-3d">
+    <input type="checkbox" checked={on} onChange={event => onChange(event.target.checked)} />
+    <span>Redox layers (3D)</span>
+  </label>
+);
+
 /**
- * One card at the top right of the map: the 2D and 3D switch where the 3D view is offered, the
+ * One card at the top right of the map: the toggle for the 3D redox layers where they are offered, the
  * basemap chooser, a separator and, when a variable is selected, its legend. The card sets the
  * width of all of them. The basemap choice is the view's, shared with the 3D scene, when there is one.
  */
@@ -49,16 +56,8 @@ export default function MapCard({ legend }) {
       <BaseLayers baseId={baseId} overlayIds={overlayIds} />
       {container && createPortal(
         <>
-          {view && (
-            <>
-              <ViewSwitch mode="2d" onChange={() => view.open3D(mapViewOf(map))} />
-              <label className="map-card-tilt">
-                <input type="checkbox" checked={view.autoTilt} onChange={event => view.setAutoTilt(event.target.checked)} />
-                <span>Tilt as you zoom</span>
-              </label>
-            </>
-          )}
           <BaseChooser baseId={baseId} overlayIds={overlayIds} onBase={setBaseId} onOverlay={toggleOverlay} />
+          {view && <RedoxLayersToggle on={view.mode !== '2d'} onChange={() => view.open3D(mapViewOf(map))} />}
           {legend && (
             <>
               <hr className="map-card-separator" />

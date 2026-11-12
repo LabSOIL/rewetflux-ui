@@ -43,7 +43,7 @@ export const BASEMAP_LAYERS = [
   },
 ];
 
-export const DEFAULT_BASEMAP_ID = 'topo';
+export const DEFAULT_BASEMAP_ID = 'aerial';
 
 /** The map's deepest zoom: the deepest native zoom of any of the layers. */
 export const MAX_ZOOM = Math.max(...BASEMAP_LAYERS.map(layer => layer.maxNativeZoom));

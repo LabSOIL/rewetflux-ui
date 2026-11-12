@@ -9,10 +9,10 @@ describe('basemap layers', () => {
     }
   });
 
-  it('shows topo by default, as a base layer', () => {
-    expect(DEFAULT_BASEMAP_ID).toBe('topo');
-    const topo = BASEMAP_LAYERS.find(layer => layer.id === DEFAULT_BASEMAP_ID);
-    expect(topo.kind).toBe('base');
+  it('shows aerial by default, as a base layer', () => {
+    expect(DEFAULT_BASEMAP_ID).toBe('aerial');
+    const aerial = BASEMAP_LAYERS.find(layer => layer.id === DEFAULT_BASEMAP_ID);
+    expect(aerial.kind).toBe('base');
   });
 
   it('draws relief as an overlay over the base layers', () => {

@@ -46,7 +46,7 @@ export async function openSite(browser, size) {
     const page = await browser.newPage({ viewport: size });
     const tile = flatTile(TILE_COLOUR);
     await page.route(TILE_URL, route => route.fulfill({ contentType: 'image/png', body: tile }));
-    await page.goto('/?view=2d');
+    await page.goto('/');
     await page.waitForSelector(MAP_CONTAINER);
     await page.waitForLoadState('networkidle');
     await page.waitForSelector(PANELS.rail);
