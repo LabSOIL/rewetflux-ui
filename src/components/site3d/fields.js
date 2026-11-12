@@ -72,18 +72,6 @@ export function readingRange(probes) {
   return values.length ? { min: Math.min(...values), max: Math.max(...values) } : null;
 }
 
-/** The value at a depth in cm from the values at DEPTHS: linear between two, held above the first and below the last. */
-export function valueAtDepth(values, depth) {
-  if (depth <= DEPTHS[0]) return values[0];
-  for (let k = 1; k < DEPTHS.length; k++) {
-    if (depth <= DEPTHS[k]) {
-      const t = (depth - DEPTHS[k - 1]) / (DEPTHS[k] - DEPTHS[k - 1]);
-      return values[k - 1] + (values[k] - values[k - 1]) * t;
-    }
-  }
-  return values[values.length - 1];
-}
-
 /**
  * The centre of each cell of a `width` x `height` grid spanning a block of half-extents
  * `halfWidth` and `halfHeight` about the origin, row 0 at the north.

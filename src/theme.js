@@ -58,10 +58,9 @@ export const theme = {
   backdropEdge: '#1c1f25',
   soilCut: '#5d4636',
   soilCutDeep: '#3b2c22',
-  // The ground before its basemap loads, the probes, the depth lines on a cut face, and the light from below.
+  // The ground before its basemap loads, the probes, and the light from below.
   sceneBlank: '#cfcfcf',
   probe: '#eeeeee',
-  cutDepthLine: '#111111',
   groundLight: '#6b5a4a',
 };
 

@@ -1,13 +1,15 @@
 import { useEffect, useRef } from 'react';
 import { theme } from '../../theme';
-import { DEPTHS, hexChannels, valueAtDepth } from './fields';
+import { DEPTHS, hexChannels } from './fields';
 
 const WIDTH = 440;
 const HEIGHT = 170;
 const MARGIN = { left: 44, right: 46, top: 10, bottom: 22 };
 // The soil column's drawn depth in px under the ground line, for the deepest slice.
 const COLUMN = 36;
-const SOIL_BAND = 5;
+const SOIL_BAND = 2;
+// The drawn height in px of each depth's band.
+const BAND = 4;
 
 function draw(canvas, samples, colour, base) {
   const ratio = window.devicePixelRatio || 1;
@@ -29,19 +31,26 @@ function draw(canvas, samples, colour, base) {
   const y = ground => MARGIN.top + (high - ground) * perMetre;
   const deepest = DEPTHS[DEPTHS.length - 1];
 
-  // The soil column under each pixel column, from the nearest sample, painted at the screen's pixel ratio.
+  // Under each pixel column, from the nearest sample: a soil band under the ground and, inside the
+  // polygon, a thin band at each depth in that depth's colour, the gaps between them left open.
   const pixels = context.createImageData(Math.round(plotWidth * ratio), Math.round(plotHeight * ratio));
   const soil = hexChannels(theme.soilCut);
   const missing = hexChannels(theme.disabled);
+  const paint = (px, from, rows, rgb) => {
+    for (let row = Math.max(0, from); row < from + rows && row < pixels.height; row++) {
+      pixels.data.set([...rgb, 255], (row * pixels.width + px) * 4);
+    }
+  };
+  const band = Math.max(1, Math.round(BAND * ratio));
   for (let px = 0; px < pixels.width; px++) {
     const s = samples[Math.round((px / (pixels.width - 1)) * (samples.length - 1))];
     const top = Math.round((y(s.ground) - MARGIN.top) * ratio);
-    const rows = Math.round((s.inside ? COLUMN : SOIL_BAND) * ratio);
-    for (let row = 0; row < rows && top + row < pixels.height; row++) {
-      const value = s.inside ? valueAtDepth(s.values, ((row + 0.5) / rows) * deepest) : NaN;
-      const rgb = s.inside ? (Number.isFinite(value) ? colour(value) : missing) : soil;
-      pixels.data.set([...rgb, 255], ((top + row) * pixels.width + px) * 4);
-    }
+    paint(px, top, Math.round(SOIL_BAND * ratio), soil);
+    if (!s.inside) continue;
+    DEPTHS.forEach((depth, k) => {
+      const centre = top + Math.round((depth / deepest) * COLUMN * ratio);
+      paint(px, centre - Math.floor(band / 2), band, Number.isFinite(s.values[k]) ? colour(s.values[k]) : missing);
+    });
   }
   context.putImageData(pixels, MARGIN.left * ratio, MARGIN.top * ratio);
 
@@ -86,7 +95,7 @@ function draw(canvas, samples, colour, base) {
   return Math.round(COLUMN / (deepest / 100) / perMetre);
 }
 
-/** The cross-section as a profile: the ground line along the cut and the soil column under it. */
+/** The cross-section as a profile: the ground line along the cut and a band per depth under it. */
 export default function ProfilePanel({ samples, colour, base }) {
   const canvas = useRef(null);
   const exaggeration = useRef(null);

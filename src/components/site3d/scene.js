@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
-import { DEPTHS, valueAtDepth } from './fields';
+import { DEPTHS } from './fields';
 import { densifyRing, insideRing, ringCentre } from './geo';
 import { theme } from '../../theme';
 
@@ -11,7 +11,6 @@ const GROUND_SLAB = 3;
 const SLICE_SLAB = 1.2;
 const EDGE_STEP = 1.5;
 const PROBE_TOP = 8;
-const CURTAIN_ROWS = 40;
 const FLY_MS = 1800;
 const OBLIQUE = { polar: 1.02, azimuth: -0.38 };
 // The context around the polygon once the slices hang below it, so they show through.
@@ -424,86 +423,65 @@ export class SiteScene {
     this.layoutCurtain();
   }
 
-  // The cut face: under each sample a column from the ground down, coloured through the depths
-  // inside the polygon and plain soil outside it; a line along the ground and one at each depth.
+  // The cut face: a soil band under the ground along the whole line and, inside the polygon, a
+  // band at each slice's drop coloured by that depth alone, the gaps between them left open.
   buildCurtain(samples) {
-    const columns = samples.length;
-    const rows = CURTAIN_ROWS + 1;
-    const grounds = new Float32Array(columns * rows);
-    const depths = new Float32Array(columns * rows);
-    const positions = new Float32Array(columns * rows * 3);
-    const colours = new Float32Array(columns * rows * 3);
-    const deepest = DEPTHS[DEPTHS.length - 1];
-    samples.forEach((s, c) => {
-      for (let r = 0; r < rows; r++) {
-        const k = c * rows + r;
-        const share = r / CURTAIN_ROWS;
-        grounds[k] = s.ground;
-        // Outside the polygon a negative depth stands for a fixed drop in metres.
-        depths[k] = s.inside ? share * deepest : -share * GROUND_SLAB;
-        positions.set([s.x, s.ground, -s.y], k * 3);
-        let colour;
-        if (s.inside) {
-          const value = valueAtDepth(s.values, share * deepest);
-          colour = channels(Number.isFinite(value) && this.colour(value));
-        } else {
-          colour = SOIL.clone().lerp(SOIL_DEEP, share);
-        }
-        colours.set([colour.r, colour.g, colour.b], k * 3);
-      }
-    });
-    const index = [];
-    for (let c = 0; c < columns - 1; c++) {
-      for (let r = 0; r < rows - 1; r++) {
-        const a = c * rows + r;
-        index.push(a, a + 1, a + rows, a + rows, a + 1, a + rows + 1);
-      }
-    }
-    const face = new THREE.BufferGeometry();
-    face.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    face.setAttribute('color', new THREE.BufferAttribute(colours, 3));
-    face.setIndex(index);
     const group = new THREE.Group();
-    group.add(new THREE.Mesh(face, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide })));
-
-    // The ground line, then a dashed line at each depth wherever the section is inside the polygon.
-    const groundLine = new THREE.Line(
+    const grounds = Float32Array.from(samples, s => s.ground);
+    const strip = (included, topColour, bottomColour) => {
+      const positions = new Float32Array(samples.length * 6);
+      const colours = new Float32Array(samples.length * 6);
+      samples.forEach((s, c) => {
+        const top = topColour(s);
+        const bottom = bottomColour(s);
+        positions.set([s.x, s.ground, -s.y, s.x, s.ground, -s.y], c * 6);
+        colours.set([top.r, top.g, top.b, bottom.r, bottom.g, bottom.b], c * 6);
+      });
+      const index = [];
+      for (let c = 0; c < samples.length - 1; c++) {
+        if (!included(samples[c]) || !included(samples[c + 1])) continue;
+        const a = 2 * c;
+        index.push(a, a + 1, a + 2, a + 2, a + 1, a + 3);
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.BufferAttribute(colours, 3));
+      geometry.setIndex(index);
+      const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+      group.add(mesh);
+      return mesh;
+    };
+    const soil = strip(() => true, () => SOIL, () => SOIL_DEEP);
+    const bands = DEPTHS.map((depth, k) => {
+      const colourOf = s => channels(Number.isFinite(s.values[k]) && this.colour(s.values[k]));
+      return { depth, mesh: strip(s => s.inside, colourOf, s => colourOf(s).multiplyScalar(0.7)) };
+    });
+    group.add(new THREE.Line(
       lineGeometry(samples.map(s => [s.x, s.ground + 0.25, -s.y])),
       new THREE.LineBasicMaterial({ color: theme.white }),
-    );
-    group.add(groundLine);
-    const depthLines = DEPTHS.map(depth => {
-      const points = [];
-      for (let c = 0; c < columns - 1; c++) {
-        if (!samples[c].inside || !samples[c + 1].inside) continue;
-        points.push([samples[c].x, samples[c].ground, -samples[c].y], [samples[c + 1].x, samples[c + 1].ground, -samples[c + 1].y]);
-      }
-      const line = new THREE.LineSegments(
-        lineGeometry(points),
-        new THREE.LineBasicMaterial({ color: theme.cutDepthLine, transparent: true, opacity: 0.45 }),
-      );
-      line.userData = { depth, grounds: points.map(p => p[1]) };
-      group.add(line);
-      return line;
-    });
-    return { group, face, grounds, depths, depthLines };
+    ));
+    return { group, grounds, soil, bands };
   }
 
   layoutCurtain() {
-    const { face, grounds, depths, depthLines } = this.curtain;
-    const positions = face.getAttribute('position');
-    for (let k = 0; k < grounds.length; k++) {
-      const d = depths[k];
-      positions.setY(k, grounds[k] - (d >= 0 ? drop(this.spacing, d) : -d));
-    }
-    positions.needsUpdate = true;
-    face.computeBoundingSphere();
-    for (const line of depthLines) {
-      const attribute = line.geometry.getAttribute('position');
-      line.userData.grounds.forEach((g, k) => attribute.setY(k, g - drop(this.spacing, line.userData.depth)));
-      attribute.needsUpdate = true;
-      line.geometry.computeBoundingSphere();
-      line.visible = this.spacing > 0.3;
+    const { spacing } = this;
+    const { grounds, soil, bands } = this.curtain;
+    const shown = spacing > 0.3;
+    // The soil band stops short of the first slice, so the two never meet on the cut.
+    const soilDepth = shown ? Math.min(GROUND_SLAB, 0.5 * drop(spacing, DEPTHS[0])) : GROUND_SLAB;
+    const place = (mesh, top, thickness) => {
+      const positions = mesh.geometry.getAttribute('position');
+      grounds.forEach((g, c) => {
+        positions.setY(2 * c, g - top);
+        positions.setY(2 * c + 1, g - top - thickness);
+      });
+      positions.needsUpdate = true;
+      mesh.geometry.computeBoundingSphere();
+    };
+    place(soil, 0, soilDepth);
+    for (const { depth, mesh } of bands) {
+      place(mesh, drop(spacing, depth), SLICE_SLAB);
+      mesh.visible = shown;
     }
   }
 

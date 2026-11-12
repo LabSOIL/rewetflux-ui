@@ -8,7 +8,6 @@ import {
   paintField,
   readingRange,
   ringCoverage,
-  valueAtDepth,
 } from './fields';
 
 const SQUARE = [[-20, -20], [20, -20], [20, 20], [-20, 20]];
@@ -60,21 +59,6 @@ describe('readingRange', () => {
 
   it('is null with no readings', () => {
     expect(readingRange([])).toBeNull();
-  });
-});
-
-describe('valueAtDepth', () => {
-  const values = [10, 20, 40, 80];
-
-  it('holds the shallowest value above the first depth and the deepest below the last', () => {
-    expect(valueAtDepth(values, 0)).toBe(10);
-    expect(valueAtDepth(values, 50)).toBe(80);
-  });
-
-  it('interpolates linearly between two depths', () => {
-    // halfway from 15 cm (20) to 25 cm (40)
-    expect(valueAtDepth(values, 20)).toBe(30);
-    expect(valueAtDepth(values, 25)).toBe(40);
   });
 });
 
