@@ -49,7 +49,15 @@ export default function MapCard({ legend }) {
       <BaseLayers baseId={baseId} overlayIds={overlayIds} />
       {container && createPortal(
         <>
-          {view && <ViewSwitch mode="2d" onChange={() => view.open3D(mapViewOf(map))} />}
+          {view && (
+            <>
+              <ViewSwitch mode="2d" onChange={() => view.open3D(mapViewOf(map))} />
+              <label className="map-card-tilt">
+                <input type="checkbox" checked={view.autoTilt} onChange={event => view.setAutoTilt(event.target.checked)} />
+                <span>Tilt as you zoom</span>
+              </label>
+            </>
+          )}
           <BaseChooser baseId={baseId} overlayIds={overlayIds} onBase={setBaseId} onOverlay={toggleOverlay} />
           {legend && (
             <>

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { MAP_CONTAINER, PANELS, SITE_3D, WINDOW_SIZES } from './selectors.js';
-import { openSite, overlaps } from './support.js';
+import { MAP_CONTAINER, PANELS, SITE_3D, TILE_URL, WINDOW_SIZES } from './selectors.js';
+import { TILE_COLOUR, flatTile, openSite, overlaps } from './support.js';
 
 const open3D = async page => {
     await page.locator(PANELS.card).getByRole('radio', { name: '3D' }).click();
@@ -29,8 +29,9 @@ for (const size of WINDOW_SIZES.slice(0, 2)) {
             card: SITE_3D.card,
             hint: SITE_3D.hint,
             profile: SITE_3D.profile,
+            nav: SITE_3D.nav,
         });
-        expect(Object.keys(boxes)).toHaveLength(6);
+        expect(Object.keys(boxes)).toHaveLength(7);
         expect(overlaps(boxes)).toEqual([]);
         await page.close();
     });
@@ -50,7 +51,28 @@ test('the 3D view draws the scene over the map and hands back to the map', async
     await page.close();
 });
 
-test('scrolling in on the site hands the map to the 3D view, and scrolling out hands it back', async ({ browser }) => {
+const scrollOutTo2D = async page => {
+    const map = await page.locator(MAP_CONTAINER).boundingBox();
+    await page.mouse.move(map.x + map.width / 2, map.y + map.height / 2);
+    for (let i = 0; i < 12 && (await page.locator(SITE_3D.root).count()); i++) {
+        await page.mouse.wheel(0, 100);
+        await page.waitForTimeout(150);
+    }
+    await page.locator(SITE_3D.root).waitFor({ state: 'detached' });
+    await expect(page.locator(MAP_CONTAINER)).toHaveCSS('opacity', '1');
+};
+
+test('the site opens in 3D, and zooming out hands it to the map', async ({ browser }) => {
+    const page = await browser.newPage({ viewport: WINDOW_SIZES[0] });
+    await page.route(TILE_URL, route => route.fulfill({ contentType: 'image/png', body: flatTile(TILE_COLOUR) }));
+    await page.goto('/');
+    await page.locator(SITE_3D.hint).waitFor();
+    await expect(page.locator(MAP_CONTAINER)).toHaveCSS('opacity', '0');
+    await scrollOutTo2D(page);
+    await page.close();
+});
+
+test('scrolling in on the site carries the map on into 3D, and scrolling out hands it back', async ({ browser }) => {
     const page = await openSite(browser, WINDOW_SIZES[0]);
     const map = await page.locator(MAP_CONTAINER).boundingBox();
     await page.mouse.move(map.x + map.width / 2, map.y + map.height / 2);
@@ -60,12 +82,17 @@ test('scrolling in on the site hands the map to the 3D view, and scrolling out h
     }
     await page.locator(SITE_3D.hint).waitFor();
     await expect(page.locator(MAP_CONTAINER)).toHaveCSS('opacity', '0');
+    await scrollOutTo2D(page);
+    await page.close();
+});
 
-    for (let i = 0; i < 6; i++) {
-        await page.mouse.wheel(0, 100);
-        await page.waitForTimeout(150);
-    }
-    await page.locator(SITE_3D.root).waitFor({ state: 'detached' });
-    await expect(page.locator(MAP_CONTAINER)).toHaveCSS('opacity', '1');
+test('right-dragging up on the map tilts it into 3D', async ({ browser }) => {
+    const page = await openSite(browser, WINDOW_SIZES[0]);
+    const map = await page.locator(MAP_CONTAINER).boundingBox();
+    await page.mouse.move(map.x + map.width / 2, map.y + map.height / 2);
+    await page.mouse.down({ button: 'right' });
+    await page.mouse.move(map.x + map.width / 2, map.y + map.height / 2 - 80, { steps: 8 });
+    await page.mouse.up({ button: 'right' });
+    await page.locator(SITE_3D.hint).waitFor();
     await page.close();
 });

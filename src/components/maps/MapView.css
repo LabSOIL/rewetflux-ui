@@ -181,7 +181,11 @@
 }
 
 .map-view > .leaflet-container {
-    transition: opacity 0.8s ease;
+    transition: opacity 0.25s ease;
+}
+
+.map-card-tilt {
+    margin-bottom: 8px;
 }
 
 .map-view.three-d > .leaflet-container {
