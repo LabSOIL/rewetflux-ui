@@ -11,9 +11,11 @@
     opacity: 1;
 }
 
+/* Its own stacking context: the labels' depth order stays under the card and the panels */
 .site3d-canvas {
     position: absolute;
     inset: 0;
+    z-index: 0;
     overflow: hidden;
 }
 

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Slider from '@mui/material/Slider';
 import { getArea, getRedoxProfiles } from '../../data';
-import { getTerrain } from '../../data/terrain';
+import { getSurroundings, getTerrain } from '../../data/terrain';
 import { useSelection } from '../../contexts/SelectionContext';
 import { useView } from '../../contexts/ViewContext';
 import { theme } from '../../theme';
@@ -14,13 +14,16 @@ import ViewSwitch from '../maps/ViewSwitch';
 import { DEPTHS, colourLookup, crossSection, depthField, hexChannels, paintField, readingRange, ringCoverage } from './fields';
 import { cutLine, ringCentre } from './geo';
 import ProfilePanel from './ProfilePanel';
-import { SiteScene } from './scene';
+import { LEVEL_STEP, SiteScene } from './scene';
 import { terrainModel } from './terrain';
 import { basemapCanvas } from './tiles';
 import './Site3D.css';
 
 const TEXTURE_CELLS = 320;
+const SURROUNDINGS_CELLS = 512;
 const BASEMAP_ZOOM = 19;
+// The surroundings' basemap: a coarse one first, which loads quickly, then a sharper one.
+const SURROUNDINGS_ZOOMS = [16, 17];
 // Metres of drop per 10 cm of depth when the scene opens.
 const DEFAULT_SPACING = 30;
 // The generated variation as a share of the readings' range.
@@ -29,7 +32,6 @@ const NOISE_SEED = 7;
 const CUT_SAMPLES = 240;
 const SHOW_MS = 350;
 const FADE_MS = 450;
-const RETURN_MS = 1400;
 
 // The site in local metres: its ground, polygon, raster grid and the positions, from the built-in data.
 function siteModel() {
@@ -44,6 +46,19 @@ function siteModel() {
     return { name: s.name, x, y };
   });
   const centre = ringCentre(ring);
+
+  // The surroundings, with a hole one coarse cell inside the block, whose own ground fills it.
+  const around = terrainModel(getSurroundings());
+  const aroundGrid = {
+    width: SURROUNDINGS_CELLS,
+    height: SURROUNDINGS_CELLS,
+    halfWidth: around.frame.halfWidth,
+    halfHeight: around.frame.halfHeight,
+  };
+  const inset = (2 * around.frame.halfWidth) / (around.nx - 1);
+  const hole = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sy]) =>
+    around.frame.toLocal(...terrain.frame.toLonLat(sx * (halfWidth - inset), sy * (halfHeight - inset))),
+  );
   return {
     terrain,
     ring,
@@ -53,6 +68,7 @@ function siteModel() {
     centre,
     reach: Math.max(...ring.map(([e, n]) => Math.hypot(e - centre[0], n - centre[1]))),
     campaigns: stops('redox', { sensors }),
+    surroundings: { terrain: around, grid: aroundGrid, coverage: ringCoverage(hole, aroundGrid) },
   };
 }
 
@@ -149,21 +165,31 @@ export default function Site3D() {
     if (variable !== 'redox') selectVariable('redox');
   }, [variable, selectVariable]);
 
+  const { leave3D } = view;
   useEffect(() => {
-    const site = new SiteScene(holder.current, { ...model, onHover: setHover, onPick: selectOption });
+    const site = new SiteScene(holder.current, { ...model, onHover: setHover, onPick: selectOption, onZoomOut: leave3D });
     site.show(site.topDownView(start.current.centre, start.current.height));
     scene.current = site;
     return () => site.dispose();
-  }, [model, selectOption]);
+  }, [model, selectOption, leave3D]);
 
+  // The block's basemap and the coarse surroundings' first, then the sharper surroundings'.
   useEffect(() => {
     let cancelled = false;
     const layers = BASEMAP_LAYERS.filter(l => l.id === view.baseId || view.overlayIds.includes(l.id));
-    basemapCanvas(layers, model.terrain.frame.mercatorBounds, BASEMAP_ZOOM, theme.sceneBlank).then(canvas => {
-      if (cancelled) return;
-      scene.current.setBasemap(canvas);
-      setPhase(current => (current === 'loading' ? 'showing' : current));
-    });
+    const draw = (bounds, zoom) => basemapCanvas(layers, bounds, zoom, theme.sceneBlank);
+    const aroundBounds = model.surroundings.terrain.frame.mercatorBounds;
+    Promise.all([draw(model.terrain.frame.mercatorBounds, BASEMAP_ZOOM), draw(aroundBounds, SURROUNDINGS_ZOOMS[0])])
+      .then(([block, around]) => {
+        if (cancelled) return null;
+        scene.current.setBasemap(block);
+        scene.current.setSurroundingsBasemap(around);
+        setPhase(current => (current === 'loading' ? 'showing' : current));
+        return draw(aroundBounds, SURROUNDINGS_ZOOMS[1]);
+      })
+      .then(sharper => {
+        if (!cancelled && sharper) scene.current.setSurroundingsBasemap(sharper);
+      });
     return () => {
       cancelled = true;
     };
@@ -182,7 +208,7 @@ export default function Site3D() {
   }, [samples]);
 
   useEffect(() => {
-    if (phase === 'open') scene.current.setSpacing(spacing);
+    if (phase === 'open') scene.current.chooseSpacing(spacing);
   }, [spacing, phase]);
 
   useEffect(() => {
@@ -192,9 +218,21 @@ export default function Site3D() {
   useEffect(() => {
     if (phase === 'showing') {
       const timer = setTimeout(() => {
-        setPhase('flying');
+        const site = scene.current;
+        const top = site.topDownView(start.current.centre, start.current.height);
+        const deep = site.obliqueView(DEFAULT_SPACING);
         view.setShown(true);
-        scene.current.flyTo(scene.current.obliqueView(DEFAULT_SPACING), () => setPhase('open'));
+        if (view.from?.via === 'zoom') {
+          // Opened by scrolling in: the scroll goes on tilting from where the map was.
+          site.followScroll(top, deep, 0, LEVEL_STEP);
+          setPhase('open');
+          return;
+        }
+        setPhase('flying');
+        site.flyTo(deep, () => {
+          site.followScroll(top, deep, 1);
+          setPhase('open');
+        });
       }, SHOW_MS);
       return () => clearTimeout(timer);
     }
@@ -216,7 +254,7 @@ export default function Site3D() {
       setPhase('fading');
     };
     if (phase === 'loading') back();
-    else scene.current.flyTo(scene.current.topDownView(start.current.centre, start.current.height), back, RETURN_MS);
+    else scene.current.leave(scene.current.topDownView(start.current.centre, start.current.height), back);
   }, [view, phase]);
 
   const visible = phase !== 'loading' && phase !== 'fading';
@@ -231,7 +269,10 @@ export default function Site3D() {
     <div className={`site3d${visible ? ' visible' : ''}`}>
       <div className="site3d-canvas" ref={holder} />
       {phase === 'open' && (
-        <div className="site3d-hint">Drag to turn, right-drag to move, scroll to zoom. Click a slice to pick its depth.</div>
+        <div className="site3d-hint">
+          Scroll in to tilt and drop the slices, then to come closer; once tilted, drag to turn and right-drag to move.
+          Scroll out to go back to the map. Click a slice to pick its depth.
+        </div>
       )}
       <div className="map-card site3d-card">
         <ViewSwitch mode="3d" onChange={view.leave3D} />

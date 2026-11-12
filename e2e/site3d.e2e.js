@@ -49,3 +49,23 @@ test('the 3D view draws the scene over the map and hands back to the map', async
     await expect(page.locator(MAP_CONTAINER)).toHaveCSS('opacity', '1');
     await page.close();
 });
+
+test('scrolling in on the site hands the map to the 3D view, and scrolling out hands it back', async ({ browser }) => {
+    const page = await openSite(browser, WINDOW_SIZES[0]);
+    const map = await page.locator(MAP_CONTAINER).boundingBox();
+    await page.mouse.move(map.x + map.width / 2, map.y + map.height / 2);
+    for (let i = 0; i < 4 && !(await page.locator(SITE_3D.root).count()); i++) {
+        await page.mouse.wheel(0, -100);
+        await page.waitForTimeout(400);
+    }
+    await page.locator(SITE_3D.hint).waitFor();
+    await expect(page.locator(MAP_CONTAINER)).toHaveCSS('opacity', '0');
+
+    for (let i = 0; i < 6; i++) {
+        await page.mouse.wheel(0, 100);
+        await page.waitForTimeout(150);
+    }
+    await page.locator(SITE_3D.root).waitFor({ state: 'detached' });
+    await expect(page.locator(MAP_CONTAINER)).toHaveCSS('opacity', '1');
+    await page.close();
+});

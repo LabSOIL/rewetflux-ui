@@ -6,15 +6,8 @@ import 'leaflet/dist/leaflet.css';
 import { BaseChooser, BaseLayers, DEFAULT_BASEMAP_ID } from './Layers';
 import Legend from './Legend';
 import ViewSwitch from './ViewSwitch';
-import { useView } from '../../contexts/ViewContext';
+import { mapViewOf, useView } from '../../contexts/ViewContext';
 import './MapView.css';
-
-// The map's view as the 3D scene opens from it: its centre and its north and south edges.
-const viewOf = map => {
-  const bounds = map.getBounds();
-  const centre = map.getCenter();
-  return { centre: [centre.lat, centre.lng], north: bounds.getNorth(), south: bounds.getSouth() };
-};
 
 /**
  * One card at the top right of the map: the 2D and 3D switch where the 3D view is offered, the
@@ -56,7 +49,7 @@ export default function MapCard({ legend }) {
       <BaseLayers baseId={baseId} overlayIds={overlayIds} />
       {container && createPortal(
         <>
-          {view && <ViewSwitch mode="2d" onChange={() => view.open3D(viewOf(map))} />}
+          {view && <ViewSwitch mode="2d" onChange={() => view.open3D(mapViewOf(map))} />}
           <BaseChooser baseId={baseId} overlayIds={overlayIds} onBase={setBaseId} onOverlay={toggleOverlay} />
           {legend && (
             <>

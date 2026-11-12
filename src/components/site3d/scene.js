@@ -12,9 +12,16 @@ const SLICE_SLAB = 1.2;
 const EDGE_STEP = 1.5;
 const PROBE_TOP = 8;
 const FLY_MS = 1800;
+const RETURN_MS = 1400;
 const OBLIQUE = { polar: 1.02, azimuth: -0.38 };
-// The context around the polygon once the slices hang below it, so they show through.
-const CONTEXT_FADED = 0.22;
+// The share of their colour the surroundings keep once the slices hang below, so the site stands out.
+const SHADED = 0.8;
+// The scroll: one wheel notch moves the zoom level this far; level 1 is the oblique view and
+// each level past it halves the distance this many times; the level eases to the wanted one.
+export const LEVEL_STEP = 0.25;
+const DOLLY = 1.5;
+const MAX_LEVEL = 2.6;
+const FOLLOW = 0.18;
 // Unselected slices are drawn at this share of their colour.
 const DIMMED = 0.5;
 
@@ -24,6 +31,16 @@ const MISSING = new THREE.Color(theme.disabled);
 
 const ease = t => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 const lerp = (a, b, t) => a + (b - a) * t;
+// The angle from a to b the short way round.
+const turn = (a, b) => ((((b - a + Math.PI) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) - Math.PI;
+const blendViews = (from, to, k) => ({
+  target: from.target.clone().lerp(to.target, k),
+  radius: lerp(from.radius, to.radius, k),
+  polar: lerp(from.polar, to.polar, k),
+  azimuth: from.azimuth + turn(from.azimuth, to.azimuth) * k,
+  spacing: lerp(from.spacing, to.spacing, k),
+  shade: lerp(from.shade, to.shade, k),
+});
 // A colour from 0 to 255 sRGB channels, or the no-data grey when there is no value.
 const channels = rgb => (rgb ? new THREE.Color().setRGB(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255, THREE.SRGBColorSpace) : MISSING.clone());
 // The vertical drop in metres below the ground of a depth in cm, at `spacing` metres per 10 cm.
@@ -120,19 +137,23 @@ function makeLabel(text, onClick) {
 }
 
 /**
- * The 3D site: the ground of the block draped with the basemap, the four depth slices hanging
- * under the polygon, the probes, and a cut face along a cross-section line. Owns its renderer,
- * camera and controls; the React view drives it through the set* methods.
+ * The 3D site: the surroundings, then over them the ground of the block draped with the basemap,
+ * the four depth slices hanging under the polygon, the probes, and a cut face along a
+ * cross-section line. The surroundings are drawn first and the site over them, so the slices
+ * show through the hills. Owns its renderer, camera and controls; the React view drives it
+ * through the set* methods.
  */
 export class SiteScene {
-  constructor(container, { terrain, ring, grid, coverage, positions, onHover, onPick }) {
+  constructor(container, { terrain, ring, grid, coverage, positions, surroundings, onHover, onPick, onZoomOut }) {
     this.container = container;
     this.terrain = terrain;
     this.ring = ring;
     this.onHover = onHover;
     this.onPick = onPick;
+    this.onZoomOut = onZoomOut;
     this.spacing = 0;
-    this.contextOpacity = 1;
+    this.shade = 1;
+    this.law = null;
     this.flight = null;
     this.cut = null;
     this.fields = [];
@@ -147,6 +168,7 @@ export class SiteScene {
     this.renderer.setSize(width, height);
     this.renderer.setClearColor(0x000000, 0);
     this.renderer.localClippingEnabled = true;
+    this.renderer.autoClear = false;
     container.appendChild(this.renderer.domElement);
     this.labels = new CSS2DRenderer();
     this.labels.setSize(width, height);
@@ -154,6 +176,7 @@ export class SiteScene {
     container.appendChild(this.labels.domElement);
 
     this.scene = new THREE.Scene();
+    this.context = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(FOV, width / height, 1, 50000);
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     Object.assign(this.controls, {
@@ -161,15 +184,18 @@ export class SiteScene {
       dampingFactor: 0.08,
       screenSpacePanning: true,
       maxPolarAngle: Math.PI * 0.6,
-      minDistance: 40,
-      maxDistance: 6000,
+      minDistance: 1,
+      maxDistance: 1e5,
+      enableZoom: false,
       enabled: false,
     });
 
-    this.scene.add(new THREE.HemisphereLight(theme.white, theme.groundLight, 2.1));
-    const sun = new THREE.DirectionalLight(theme.white, 1.7);
-    sun.position.set(-300, 420, 260);
-    this.scene.add(sun);
+    for (const target of [this.scene, this.context]) {
+      target.add(new THREE.HemisphereLight(theme.white, theme.groundLight, 2.1));
+      const sun = new THREE.DirectionalLight(theme.white, 1.7);
+      sun.position.set(-300, 420, 260);
+      target.add(sun);
+    }
 
     this.plane = new THREE.Plane(new THREE.Vector3(1, 0, 0), 0);
     this.centre = ringCentre(ring);
@@ -178,6 +204,7 @@ export class SiteScene {
     this.eastmost = this.edge.reduce((a, p) => (p[0] > a[0] ? p : a));
 
     this.buildGround(grid, coverage);
+    this.buildSurroundings(surroundings);
     this.buildSlices();
     this.buildPositions(positions);
     this.probes = new THREE.Group();
@@ -201,17 +228,9 @@ export class SiteScene {
     this.insideMask = rowsTexture(maskPixels(coverage, false), grid.width, grid.height, false);
     this.outsideMask = rowsTexture(maskPixels(coverage, true), grid.width, grid.height, false);
 
-    this.context = new THREE.Mesh(
+    this.blockAround = new THREE.Mesh(
       this.geometry,
-      this.track(new THREE.MeshLambertMaterial({
-        color: theme.sceneBlank,
-        alphaMap: this.outsideMask,
-        transparent: true,
-        alphaTest: 0.02,
-        polygonOffset: true,
-        polygonOffsetFactor: 1,
-        polygonOffsetUnits: 4,
-      })),
+      this.track(new THREE.MeshLambertMaterial({ color: theme.sceneBlank, alphaMap: this.outsideMask, alphaTest: 0.5 }), false),
     );
     this.surface = new THREE.Mesh(
       this.geometry,
@@ -230,7 +249,21 @@ export class SiteScene {
     const label = makeLabel('Ground');
     label.position.set(e + 8, heightAt(e, n), -n);
     this.groundParts = [this.surface, wall, outline, label];
-    this.scene.add(this.context, ...this.groundParts);
+    this.context.add(this.blockAround);
+    this.scene.add(...this.groundParts);
+  }
+
+  // The coarser ground around the block, placed in the block's frame and base, with a hole where
+  // the block's own ground lies; it sits a metre low so the block's ground wins where they meet.
+  buildSurroundings({ terrain, grid, coverage }) {
+    this.holeMask = rowsTexture(maskPixels(coverage, true), grid.width, grid.height, false);
+    this.around = new THREE.Mesh(
+      groundGeometry(terrain),
+      this.track(new THREE.MeshLambertMaterial({ color: theme.sceneBlank, alphaMap: this.holeMask, alphaTest: 0.5 }), false),
+    );
+    const [e, n] = this.terrain.frame.toLocal(...terrain.frame.toLonLat(0, 0));
+    this.around.position.set(e, terrain.base - this.terrain.base - 1, -n);
+    this.context.add(this.around);
   }
 
   /** Shows or hides the ground over the polygon and the positions on it, uncovering the slices. */
@@ -271,17 +304,31 @@ export class SiteScene {
     this.disposables.push(geometry);
   }
 
-  /** The basemap drawn over the block, as a canvas spanning the terrain's bounds. */
-  setBasemap(canvas) {
+  canvasTexture(canvas) {
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
-    for (const mesh of [this.context, this.surface]) {
-      mesh.material.map?.dispose();
+    return texture;
+  }
+
+  /** The basemap drawn over the block, as a canvas spanning the terrain's bounds. */
+  setBasemap(canvas) {
+    const texture = this.canvasTexture(canvas);
+    this.surface.material.map?.dispose();
+    for (const mesh of [this.blockAround, this.surface]) {
       mesh.material.map = texture;
-      mesh.material.color.set(theme.white);
       mesh.material.needsUpdate = true;
     }
+    this.surface.material.color.set(theme.white);
+    this.setShade(this.shade);
+  }
+
+  /** The basemap drawn over the surroundings, as a canvas spanning their bounds. */
+  setSurroundingsBasemap(canvas) {
+    this.around.material.map?.dispose();
+    this.around.material.map = this.canvasTexture(canvas);
+    this.around.material.needsUpdate = true;
+    this.setShade(this.shade);
   }
 
   /**
@@ -386,12 +433,18 @@ export class SiteScene {
     if (this.curtain) this.layoutCurtain();
   }
 
-  setContextOpacity(opacity) {
-    this.contextOpacity = opacity;
-    const { material } = this.context;
-    material.opacity = opacity;
-    material.depthWrite = opacity > 0.98;
-    this.context.visible = opacity > 0.01;
+  /** The share of their colour the block's edges and the surroundings are drawn at, once they carry a basemap. */
+  setShade(shade) {
+    this.shade = shade;
+    for (const mesh of [this.blockAround, this.around]) {
+      if (mesh.material.map) mesh.material.color.setScalar(shade);
+    }
+  }
+
+  /** The slices' spacing the user chose: it holds at the oblique view and past it. */
+  chooseSpacing(spacing) {
+    if (this.law) this.law.deep.spacing = spacing;
+    if (!this.law || this.law.level >= 1) this.setSpacing(spacing);
   }
 
   /**
@@ -495,7 +548,7 @@ export class SiteScene {
       polar: 0.0001,
       azimuth: 0,
       spacing: 0,
-      context: 1,
+      shade: 1,
     };
   }
 
@@ -511,7 +564,7 @@ export class SiteScene {
       radius: radius * 0.92,
       ...OBLIQUE,
       spacing,
-      context: CONTEXT_FADED,
+      shade: SHADED,
     };
   }
 
@@ -524,16 +577,16 @@ export class SiteScene {
       polar: spherical.phi,
       azimuth: spherical.theta,
       spacing: this.spacing,
-      context: this.contextOpacity,
+      shade: this.shade,
     };
   }
 
-  applyView({ target, radius, polar, azimuth, spacing, context }) {
+  applyView({ target, radius, polar, azimuth, spacing, shade }) {
     this.controls.target.copy(target);
     this.camera.position.copy(target).add(new THREE.Vector3().setFromSphericalCoords(radius, polar, azimuth));
     this.camera.lookAt(target);
     if (spacing !== this.spacing) this.setSpacing(spacing);
-    if (context !== this.contextOpacity) this.setContextOpacity(context);
+    if (shade !== this.shade) this.setShade(shade);
   }
 
   /** Jumps to a view. */
@@ -545,24 +598,13 @@ export class SiteScene {
   /** Flies from the current view to another, then calls `done`; the controls wait meanwhile. */
   flyTo(view, done, ms = FLY_MS) {
     this.controls.enabled = false;
-    const from = this.currentView();
-    let turn = view.azimuth - from.azimuth;
-    turn = ((turn + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
-    this.flight = { from, to: { ...view, azimuth: from.azimuth + turn }, start: performance.now(), ms, done };
+    this.flight = { from: this.currentView(), to: view, start: performance.now(), ms, done };
   }
 
   stepFlight(now) {
     const { from, to, start, ms, done } = this.flight;
     const t = Math.min(1, (now - start) / ms);
-    const k = ease(t);
-    this.applyView({
-      target: from.target.clone().lerp(to.target, k),
-      radius: lerp(from.radius, to.radius, k),
-      polar: lerp(from.polar, to.polar, k),
-      azimuth: lerp(from.azimuth, to.azimuth, k),
-      spacing: lerp(from.spacing, to.spacing, k),
-      context: lerp(from.context, to.context, k),
-    });
+    this.applyView(blendViews(from, to, ease(t)));
     if (t < 1) return;
     this.flight = null;
     this.controls.enabled = true;
@@ -570,11 +612,64 @@ export class SiteScene {
     done?.();
   }
 
+  /**
+   * Puts the camera under the scroll. The zoom level runs from 0, the view `top` from above, to 1,
+   * the view `deep`, tilting and dropping the slices on the way; past 1 the camera moves closer and
+   * turns and pans freely. Scrolling out below 0 calls `onZoomOut`.
+   */
+  followScroll(top, deep, level, wanted = level) {
+    this.law = { top, deep, level, wanted };
+    this.controls.enabled = true;
+    this.lawControls(level);
+  }
+
+  /** Flies back to the view from above and calls `done`, at once when the scroll has already brought it there. */
+  leave(top, done) {
+    const there = this.law && this.law.level <= 0;
+    this.law = null;
+    this.flyTo(top, done, there ? 1 : RETURN_MS);
+  }
+
+  lawControls(level) {
+    this.controls.enableRotate = level > 1;
+    this.controls.enablePan = level > 1;
+  }
+
+  stepLaw() {
+    const law = this.law;
+    const before = law.level;
+    law.level += (law.wanted - law.level) * FOLLOW;
+    if (Math.abs(law.wanted - law.level) < 1e-3) law.level = law.wanted;
+    if (law.level < -0.02) {
+      this.law = null;
+      this.onZoomOut?.();
+      return;
+    }
+    this.lawControls(law.level);
+    if (law.level <= 1) {
+      // Coming back from closer in, the tilt eases from wherever the camera was turned and moved to.
+      if (before > 1) law.deep = { ...this.currentView(), radius: law.deep.radius };
+      this.applyView(blendViews(law.top, law.deep, ease(Math.max(0, law.level))));
+      return;
+    }
+    const radius = law.deep.radius * 2 ** (-(law.level - 1) * DOLLY);
+    this.camera.position.sub(this.controls.target).setLength(radius).add(this.controls.target);
+    this.controls.update();
+  }
+
+  wheel(event) {
+    event.preventDefault();
+    if (!this.law || this.flight) return;
+    const notches = event.deltaMode === 1 ? event.deltaY / 3 : event.deltaMode === 2 ? event.deltaY : event.deltaY / 100;
+    this.law.wanted = Math.min(MAX_LEVEL, Math.max(-0.2, this.law.wanted - notches * LEVEL_STEP));
+  }
+
   // --- Frame, pointer and size ---
 
   frame() {
     const now = performance.now();
     if (this.flight) this.stepFlight(now);
+    else if (this.law) this.stepLaw();
     else this.controls.update();
     if (this.cut && this.plane.distanceToPoint(this.camera.position) > 0) this.plane.negate();
     if (this.pointer?.moved && !this.flight) {
@@ -582,6 +677,9 @@ export class SiteScene {
       const hit = this.pick(this.pointer.ndc);
       this.onHover?.(hit && { ...hit, clientX: this.pointer.x, clientY: this.pointer.y });
     }
+    this.renderer.clear();
+    this.renderer.render(this.context, this.camera);
+    this.renderer.clearDepth();
     this.renderer.render(this.scene, this.camera);
     this.labels.render(this.scene, this.camera);
   }
@@ -637,11 +735,14 @@ export class SiteScene {
       const hit = this.pick(this.pointer.ndc);
       if (hit?.kind === 'slice' || hit?.kind === 'probe') this.onPick?.(hit.depth);
     };
+    const wheel = event => this.wheel(event);
+    element.addEventListener('wheel', wheel, { passive: false });
     element.addEventListener('pointermove', move);
     element.addEventListener('pointerleave', leave);
     element.addEventListener('pointerdown', press);
     element.addEventListener('pointerup', release);
     this.unbindPointer = () => {
+      element.removeEventListener('wheel', wheel);
       element.removeEventListener('pointermove', move);
       element.removeEventListener('pointerleave', leave);
       element.removeEventListener('pointerdown', press);
@@ -664,13 +765,16 @@ export class SiteScene {
     this.resizeObserver.disconnect();
     this.unbindPointer();
     this.controls.dispose();
-    this.scene.traverse(o => {
-      o.geometry?.dispose();
-      if (o.material) {
-        o.material.map?.dispose();
-        o.material.dispose();
-      }
-    });
+    for (const root of [this.scene, this.context]) {
+      root.traverse(o => {
+        o.geometry?.dispose();
+        if (o.material) {
+          o.material.map?.dispose();
+          o.material.dispose();
+        }
+      });
+    }
+    this.holeMask.dispose();
     this.insideMask.dispose();
     this.outsideMask.dispose();
     for (const d of this.disposables) d.dispose();
