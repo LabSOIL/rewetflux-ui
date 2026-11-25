@@ -124,3 +124,56 @@ export function cutLine(centre, angle, offset, halfWidth, halfHeight) {
   if (lo >= hi) return null;
   return { from: [px + dx * lo, py + dy * lo], to: [px + dx * hi, py + dy * hi], normal };
 }
+
+/**
+ * Where the line from `from` to `to` crosses a ring, as shares along it from `from`: `[enter, leave]`,
+ * the first crossing and the last, or null when the line misses the ring.
+ */
+export function ringSpan(ring, [fx, fy], [tx, ty]) {
+  const dx = tx - fx;
+  const dy = ty - fy;
+  let enter = Infinity;
+  let leave = -Infinity;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [px, py] = ring[j];
+    const ex = ring[i][0] - px;
+    const ey = ring[i][1] - py;
+    const across = dx * ey - dy * ex;
+    if (Math.abs(across) < 1e-12) continue;
+    // The edge's share where it meets the line, and the line's share there.
+    const s = ((fx - px) * dy - (fy - py) * dx) / -across;
+    if (s < 0 || s >= 1) continue;
+    const t = ((px - fx) * ey - (py - fy) * ex) / across;
+    enter = Math.min(enter, t);
+    leave = Math.max(leave, t);
+  }
+  return enter < leave ? [enter, leave] : null;
+}
+
+/** The direction in degrees, anticlockwise from east and from 0 up to 360, from one point to another. */
+export const bearing = ([x0, y0], [x1, y1]) => ((Math.atan2(y1 - y0, x1 - x0) / RAD) % 360 + 360) % 360;
+
+/**
+ * The offset along its left normal that puts a cut at `angle` degrees through `pivot`, measured
+ * from `centre` as `cutLine` measures it: turning the cut about a point on it keeps that point on it.
+ */
+export function offsetThrough(centre, pivot, angle) {
+  return -(pivot[0] - centre[0]) * Math.sin(angle * RAD) + (pivot[1] - centre[1]) * Math.cos(angle * RAD);
+}
+
+/**
+ * The point of a ring, as a cut leaves it, furthest right on the screen: a corner of the ring on the
+ * side `kept` keeps, or one of the cut's `ends` across it. `screenX` gives a point's place on the screen.
+ */
+export function labelCorner({ ring, ends = [], kept = () => true, screenX }) {
+  let best = null;
+  let right = -Infinity;
+  for (const corner of [...ring.filter(kept), ...ends]) {
+    const x = screenX(corner);
+    if (x > right) {
+      right = x;
+      best = corner;
+    }
+  }
+  return best;
+}

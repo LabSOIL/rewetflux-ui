@@ -18,9 +18,7 @@ export default function MapCard({ legend }) {
   const view = useView();
   const [container, setContainer] = useState(null);
   const [ownBaseId, setOwnBaseId] = useState(DEFAULT_BASEMAP_ID);
-  const [ownOverlayIds, setOwnOverlayIds] = useState([]);
   const baseId = view?.baseId ?? ownBaseId;
-  const overlayIds = view?.overlayIds ?? ownOverlayIds;
   const setBaseId = view?.setBaseId ?? setOwnBaseId;
 
   useEffect(() => {
@@ -39,16 +37,12 @@ export default function MapCard({ legend }) {
     };
   }, [map]);
 
-  const toggleOverlay = view?.toggleOverlay ?? ((id, on) => setOwnOverlayIds(
-    ids => (on ? [...ids.filter(other => other !== id), id] : ids.filter(other => other !== id)),
-  ));
-
   return (
     <>
-      <BaseLayers baseId={baseId} overlayIds={overlayIds} />
+      <BaseLayers baseId={baseId} />
       {container && createPortal(
         <>
-          <BaseChooser baseId={baseId} overlayIds={overlayIds} onBase={setBaseId} onOverlay={toggleOverlay} />
+          <BaseChooser baseId={baseId} onBase={setBaseId} />
           {legend && (
             <>
               <hr className="map-card-separator" />

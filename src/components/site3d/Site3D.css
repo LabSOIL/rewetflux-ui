@@ -52,6 +52,11 @@
     white-space: nowrap;
 }
 
+/* Clear of the cut's turn handle, which can sit on the same corner as the top slice's label */
+.site3d-label.site3d-depth-label {
+    margin-left: 20px;
+}
+
 .site3d-label.selected {
     color: var(--accent-text);
     font-weight: 600;
@@ -61,6 +66,62 @@
 .site3d-label-button {
     pointer-events: auto;
     cursor: pointer;
+}
+
+/* The cross-section's handles on its cut line: the move handles' arrows turn with the cut.
+   The label renderer places them with `transform`, so they never take `scale` or `translate`, which would move them. */
+.site3d-cut-handle {
+    display: grid;
+    place-items: center;
+    box-sizing: border-box;
+    width: 34px;
+    height: 34px;
+    border: 2px solid var(--white);
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 1px 8px var(--shadow);
+    cursor: grab;
+    pointer-events: auto;
+    touch-action: none;
+}
+
+.site3d-cut-handle:hover {
+    background: color-mix(in srgb, var(--accent) 80%, var(--white));
+}
+
+.site3d-cut-handle:focus-visible {
+    outline: 2px solid var(--accent-text);
+    outline-offset: 2px;
+}
+
+.site3d-cut-handle svg {
+    width: 20px;
+    height: 20px;
+    fill: var(--white);
+}
+
+/* The turn handles at the ends of the cut: the colours reversed, so they read apart from the move handles */
+.site3d-cut-turn {
+    width: 30px;
+    height: 30px;
+    border-color: var(--accent);
+    background: var(--white);
+}
+
+.site3d-cut-turn:hover {
+    background: color-mix(in srgb, var(--white) 85%, var(--accent));
+}
+
+.site3d-cut-turn svg {
+    width: 18px;
+    height: 18px;
+    fill: var(--accent);
+}
+
+/* While one is dragged, the grabbing hand holds wherever the pointer goes */
+.site3d-canvas.site3d-cut-dragging,
+.site3d-canvas.site3d-cut-dragging * {
+    cursor: grabbing;
 }
 
 .site3d-card {

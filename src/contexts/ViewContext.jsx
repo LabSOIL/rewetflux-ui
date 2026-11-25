@@ -36,7 +36,8 @@ export const mapViewOf = map => {
  * `mode` is '2d', '3d' while the scene is open, or 'leaving' while it goes back to the map;
  * `shown` is true while the scene covers the map; `from` is the map's view when 3D opened;
  * `returnTo` is where the scene looked as it handed back, `{ lon, lat, metresPerPixel }`;
- * `autoTilt` is whether the 3D view tilts as it zooms in.
+ * `autoTilt` is whether the 3D view tilts as it zooms in; `crossSection` is whether it cuts
+ * through the ground and the slices, off each time the scene opens.
  */
 export function ViewProvider({ children, start3D = opensIn3D }) {
   const [initially3D] = useState(start3D);
@@ -44,14 +45,10 @@ export function ViewProvider({ children, start3D = opensIn3D }) {
   const [from, setFrom] = useState(null);
   const [shown, setShown] = useState(initially3D);
   const [baseId, setBaseId] = useState(DEFAULT_BASEMAP_ID);
-  const [overlayIds, setOverlayIds] = useState([]);
   const [returnTo, setReturnTo] = useState(null);
   const [autoTilt, setAutoTilt] = useState(true);
+  const [crossSection, setCrossSection] = useState(false);
 
-  const toggleOverlay = useCallback(
-    (id, on) => setOverlayIds(ids => (on ? [...ids.filter(other => other !== id), id] : ids.filter(other => other !== id))),
-    [],
-  );
   const open3D = useCallback(view => {
     setFrom(view);
     setMode('3d');
@@ -69,6 +66,7 @@ export function ViewProvider({ children, start3D = opensIn3D }) {
   const closed = useCallback(() => {
     setShown(false);
     setMode('2d');
+    setCrossSection(false);
   }, []);
 
   const value = useMemo(
@@ -77,21 +75,34 @@ export function ViewProvider({ children, start3D = opensIn3D }) {
       from,
       shown,
       baseId,
-      overlayIds,
       returnTo,
       autoTilt,
+      crossSection,
       setBaseId,
       setShown,
       setReturnTo,
       setAutoTilt,
-      toggleOverlay,
+      setCrossSection,
       open3D,
       leave3D,
       toggle3D,
       registerMap,
       closed,
     }),
-    [mode, from, shown, baseId, overlayIds, returnTo, autoTilt, toggleOverlay, open3D, leave3D, toggle3D, registerMap, closed],
+    [
+      mode,
+      from,
+      shown,
+      baseId,
+      returnTo,
+      autoTilt,
+      crossSection,
+      open3D,
+      leave3D,
+      toggle3D,
+      registerMap,
+      closed,
+    ],
   );
   return <ViewContext.Provider value={value}>{children}</ViewContext.Provider>;
 }

@@ -23,7 +23,7 @@ import {
 import { cutLine, ringCentre } from './geo';
 import ProfilePanel from './ProfilePanel';
 import { signal, useSignal } from './signal';
-import { SiteScene, ZOOM_STEP } from './scene';
+import { OPENING_CUT_ANGLE, SiteScene, ZOOM_STEP } from './scene';
 import { terrainModel } from './terrain';
 import { loadTower } from './tower';
 import { basemapCanvas } from './tiles';
@@ -126,12 +126,12 @@ const cachedCanvas = (layers, bounds, zoom) => {
   if (!canvases.has(key)) canvases.set(key, basemapCanvas(layers, bounds, zoom, theme.sceneBlank));
   return canvases.get(key);
 };
-const layersOf = (baseId, overlayIds) => BASEMAP_LAYERS.filter(l => l.id === baseId || overlayIds.includes(l.id));
+const layersOf = baseId => BASEMAP_LAYERS.filter(l => l.id === baseId);
 
 /** Builds the site model, draws the basemaps the scene opens with and loads the tower, ahead of opening it. */
-export function prepare(baseId, overlayIds) {
+export function prepare(baseId) {
   const model = cachedModel();
-  const layers = layersOf(baseId, overlayIds);
+  const layers = layersOf(baseId);
   cachedCanvas(layers, model.terrain.frame.mercatorBounds, BASEMAP_ZOOM);
   cachedCanvas(layers, model.surroundings.terrain.frame.mercatorBounds, SURROUNDINGS_ZOOM);
   const campaign = model.campaigns[model.campaigns.length - 1];
@@ -208,10 +208,6 @@ function CutProfile({ profile, colour, base }) {
   return samples ? <ProfilePanel samples={samples} colour={colour} base={base} /> : null;
 }
 
-function TiltNote({ profile }) {
-  return useSignal(profile) ? null : <p className="site3d-note">Tilt the view to see the section</p>;
-}
-
 const sliderSx = {
   color: theme.accent,
   py: '10px',
@@ -236,11 +232,10 @@ export default function Site3D() {
   const [basemapStrength, setBasemapStrength] = useState(DEFAULT_BASEMAP_STRENGTH);
   const [groundOn, setGroundOn] = useState(true);
   const [peel, setPeel] = useState(false);
-  const [cutOn, setCutOn] = useState(false);
-  const [cutOffset, setCutOffset] = useState(0);
-  const [cutAngle, setCutAngle] = useState(90);
-  const [cutFollows, setCutFollows] = useState(true);
-  const [cutLayers, setCutLayers] = useState(true);
+  // The cross-section's handles set its direction in degrees and its offset from the polygon's
+  // centre as a share of its reach; the rail turns it on and off.
+  const [cut, setCut] = useState({ angle: OPENING_CUT_ANGLE, offset: 0 });
+  const cutOn = view.crossSection && phase !== 'returning' && phase !== 'fading';
   // Hovering and the cut's profile change often: they are signals, so only their own parts re-render.
   const hover = useMemo(() => signal(null), []);
   const profile = useMemo(() => signal(null), []);
@@ -253,11 +248,10 @@ export default function Site3D() {
   const cutAt = useMemo(() => {
     const { halfWidth, halfHeight } = model.terrain.frame;
     const { offset: [oe, on], halfWidth: aw, halfHeight: ah } = model.landscape;
-    // Without `full`, only the line: the scene turns its plane with it between rebuilds of the faces.
-    return (angle, full = true) => {
-      const line = cutLine(model.centre, angle, cutOffset * model.reach, halfWidth, halfHeight);
-      if (!line || !full) return { line };
-      const long = cutLine([model.centre[0] - oe, model.centre[1] - on], angle, cutOffset * model.reach, aw, ah);
+    return angle => {
+      const line = cutLine(model.centre, angle, cut.offset * model.reach, halfWidth, halfHeight);
+      if (!line) return { line };
+      const long = cutLine([model.centre[0] - oe, model.centre[1] - on], angle, cut.offset * model.reach, aw, ah);
       return {
         line,
         samples: crossSection({
@@ -280,7 +274,7 @@ export default function Site3D() {
           }),
       };
     };
-  }, [cutOffset, model, rasters]);
+  }, [cut.offset, model, rasters]);
 
   // The slices are redox, so the rail switches to it once, as the view opens.
   const entered = useRef(false);
@@ -308,6 +302,7 @@ export default function Site3D() {
       onPick: selectOption,
       onCompass,
       onCutSamples: profile.set,
+      onCut: setCut,
     });
     site.show(site.topDownView(start.current.centre, start.current.height));
     scene.current = site;
@@ -325,7 +320,7 @@ export default function Site3D() {
   // upload before the scene shows, so its first frames do not stall.
   useEffect(() => {
     let cancelled = false;
-    const layers = layersOf(view.baseId, view.overlayIds);
+    const layers = layersOf(view.baseId);
     const draw = (bounds, zoom) => cachedCanvas(layers, bounds, zoom);
     const aroundBounds = model.surroundings.terrain.frame.mercatorBounds;
     Promise.all([draw(model.terrain.frame.mercatorBounds, BASEMAP_ZOOM), draw(aroundBounds, SURROUNDINGS_ZOOM)]).then(
@@ -340,7 +335,7 @@ export default function Site3D() {
     return () => {
       cancelled = true;
     };
-  }, [view.baseId, view.overlayIds, model]);
+  }, [view.baseId, model]);
 
   useEffect(() => {
     scene.current.setRasters({ ...rasters, grid: model.grid });
@@ -362,8 +357,8 @@ export default function Site3D() {
   }, [peel]);
 
   useEffect(() => {
-    scene.current.setCut(cutOn ? { cutAt, follow: cutFollows, angle: cutAngle, layers: cutLayers } : null);
-  }, [cutOn, cutAt, cutFollows, cutAngle, cutLayers]);
+    scene.current.setCut(cutOn ? { cutAt, angle: cut.angle, offset: cut.offset } : null);
+  }, [cutOn, cutAt, cut]);
 
   useEffect(() => {
     scene.current.chooseSpacing(spacing);
@@ -411,7 +406,6 @@ export default function Site3D() {
     if (view.mode !== 'leaving' || phase === 'returning' || phase === 'fading') return;
     setPhase('returning');
     hover.set(null);
-    setCutOn(false);
     setGroundOn(true);
     const site = scene.current;
     site.setSteering(false);
@@ -441,17 +435,12 @@ export default function Site3D() {
         {phase === 'open' && (
           <div className="site3d-hint">
             Scroll to zoom, drag to move, right-drag or Shift-drag to turn and tilt. Click a slice to pick its depth.
-            Turn 3D layers off in the side bar to return to the map.
+            Cross-section in the side bar cuts through them: drag its round handles to move it or turn it. Turn
+            3D layers off to return to the map.
           </div>
         )}
         <div className="map-card site3d-card">
-          <BaseChooser
-            name="basemap-3d"
-            baseId={view.baseId}
-            overlayIds={view.overlayIds}
-            onBase={view.setBaseId}
-            onOverlay={view.toggleOverlay}
-          />
+          <BaseChooser name="basemap-3d" baseId={view.baseId} onBase={view.setBaseId} />
           <hr className="map-card-separator" />
           <div className="site3d-control">
             <div className="site3d-control-label">
@@ -496,53 +485,6 @@ export default function Site3D() {
             <input type="checkbox" checked={peel} onChange={event => setPeel(event.target.checked)} />
             <span>Peel layers above the depth</span>
           </label>
-          <label className="site3d-check">
-            <input type="checkbox" checked={cutOn} onChange={event => setCutOn(event.target.checked)} />
-            <span>Cross-section</span>
-          </label>
-          {cutOn && (
-            <div className="site3d-control">
-              <div className="site3d-control-label">
-                <span>Position</span>
-              </div>
-              <Slider
-                size="small"
-                min={-1}
-                max={1}
-                step={0.01}
-                value={cutOffset}
-                onChange={(_, value) => setCutOffset(value)}
-                aria-label="Cut position"
-                sx={sliderSx}
-              />
-              <label className="site3d-check">
-                <input type="checkbox" checked={cutFollows} onChange={event => setCutFollows(event.target.checked)} />
-                <span>Follow the view</span>
-              </label>
-              {!cutFollows && (
-                <>
-                  <div className="site3d-control-label">
-                    <span>Direction</span>
-                    <span className="site3d-control-value">{cutAngle}°</span>
-                  </div>
-                  <Slider
-                    size="small"
-                    min={0}
-                    max={179}
-                    value={cutAngle}
-                    onChange={(_, value) => setCutAngle(value)}
-                    aria-label="Cut direction"
-                    sx={sliderSx}
-                  />
-                </>
-              )}
-              <label className="site3d-check">
-                <input type="checkbox" checked={cutLayers} onChange={event => setCutLayers(event.target.checked)} />
-                <span>Cut the layers too</span>
-              </label>
-              <TiltNote profile={profile} />
-            </div>
-          )}
           <hr className="map-card-separator" />
           <Legend {...legend} />
           <p className="site3d-note">

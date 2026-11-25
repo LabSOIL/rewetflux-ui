@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import ContentCutOutlinedIcon from '@mui/icons-material/ContentCutOutlined';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import LayersOutlinedIcon from '@mui/icons-material/LayersOutlined';
 import ViewInArOutlinedIcon from '@mui/icons-material/ViewInArOutlined';
@@ -44,6 +45,20 @@ export default function SidePanel() {
               <ViewInArOutlinedIcon />
               <span>3D layers</span>
               <span className="current-selection">{layers3D ? 'On' : 'Off'}</span>
+            </div>
+          </button>
+        )}
+        {layers3D && (
+          // The 3D layers' own option, opened under them while they are on.
+          <button
+            onClick={() => view.setCrossSection(!view.crossSection)}
+            className={`sub-option${view.crossSection ? ' active' : ''}`}
+            aria-pressed={view.crossSection}
+          >
+            <div className="button-content">
+              <ContentCutOutlinedIcon />
+              <span>Cross-section</span>
+              <span className="current-selection">{view.crossSection ? 'On' : 'Off'}</span>
             </div>
           </button>
         )}

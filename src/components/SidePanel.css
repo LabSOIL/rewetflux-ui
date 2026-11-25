@@ -45,6 +45,15 @@
     box-sizing: border-box;
 }
 
+.button-group button.sub-option {
+    height: 60px;
+    box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.button-group button.sub-option svg {
+    font-size: 20px;
+}
+
 .button-group button:last-child {
     border-bottom: none;
 }

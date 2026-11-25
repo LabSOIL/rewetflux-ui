@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { DEPTHS } from './fields';
-import { densifyRing, innerPoint, insideRing, ringCentre, viewCutAngle } from './geo';
+import { bearing, densifyRing, innerPoint, insideRing, labelCorner, offsetThrough, ringCentre, ringSpan, viewCutAngle } from './geo';
 import { TOWER_HEIGHT, symbolScale } from './tower';
 import { theme } from '../../theme';
 
@@ -16,19 +16,28 @@ const PROBE_TOP = 8;
 const TOWER_MIN_PIXELS = 96;
 // How far below the lowest ground along a cut the landscape's cut face reaches, in metres.
 const LANDSCAPE_FLOOR = 40;
-// A following cut eases this share of the way to the view's heading each frame; its plane turns
-// with it every frame, its faces are rebuilt once it has turned this many degrees, and the
-// profile is sent once the faces have stood still this long.
-const CUT_EASE = 0.12;
-const CUT_REBUILD_DEGREES = 1;
-const PROFILE_SETTLE_MS = 250;
 // The cut shows only on a tilted view: it turns on above the first tilt and off below the second, in radians.
 const CUT_ON_TILT = (10 * Math.PI) / 180;
 const CUT_OFF_TILT = (7 * Math.PI) / 180;
+// The cut's handles sit this many metres above the ground on its stretch over the polygon: the
+// move handles at these shares of it, the turn handles at its ends.
+const MOVE_SHARES = [0.25, 0.75];
+const HANDLE_LIFT = 1;
+// A key moves the cut this share of the polygon's reach, or turns it this many degrees; Page Up
+// and Page Down go four times as far. Shift while turning snaps the direction to the snap step.
+const MOVE_KEY_STEP = 0.05;
+const TURN_KEY_STEP = 5;
+const TURN_SNAP = 15;
+// The handles' icons: arrows across the cut for the move handles, turning arrows for the turn handles.
+const MOVE_ICON = '<path d="M2 12 L7 7 V10 H17 V7 L22 12 L17 17 V14 H7 V17 Z" />';
+const TURN_ICON =
+  '<path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z" />';
 // Hovering picks at most this often, and never while the view is dragged.
 const PICK_MS = 100;
 const FLY_MS = 1000;
 const OBLIQUE = { polar: 0.9, azimuth: -0.38 };
+// The cut's direction as the scene opens: across the opening view's line of sight, in whole degrees.
+export const OPENING_CUT_ANGLE = Math.round(viewCutAngle(OBLIQUE.azimuth));
 // The tilt in radians at which the slices hang at their full spacing; they drop as the view tilts towards it.
 export const TILTED = 0.9;
 // A view tilted less than this counts as flat, so handing back to the map needs no flight.
@@ -61,8 +70,6 @@ const MISSING = new THREE.Color(theme.disabled);
 
 const ease = t => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 const lerp = (a, b, t) => a + (b - a) * t;
-// The angle in degrees from a to b the short way round.
-const turnDegrees = (a, b) => ((((b - a + 180) % 360) + 360) % 360) - 180;
 // The angle from a to b the short way round.
 const turn = (a, b) => ((((b - a + Math.PI) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) - Math.PI;
 const blendViews = (from, to, k) => ({
@@ -179,7 +186,7 @@ function makeLabel(text, onClick) {
  * through the set* methods.
  */
 export class SiteScene {
-  constructor(container, { terrain, ring, grid, coverage, positions, surroundings, spacing, flat, autoTilt, onHover, onPick, onCompass, onCutSamples }) {
+  constructor(container, { terrain, ring, grid, coverage, positions, surroundings, spacing, flat, autoTilt, onHover, onPick, onCompass, onCutSamples, onCut }) {
     this.container = container;
     this.terrain = terrain;
     this.ring = ring;
@@ -187,12 +194,9 @@ export class SiteScene {
     this.onPick = onPick;
     this.onCompass = onCompass;
     this.onCutSamples = onCutSamples;
-    this.cutAngle = null;
+    this.onCut = onCut;
     this.cutActive = false;
-    this.builtAt = 0;
     this.pickedAt = 0;
-    this.profileDue = false;
-    this.profileNow = false;
     this.chosenSpacing = spacing;
     this.spacing = 0;
     this.shade = 1;
@@ -263,7 +267,6 @@ export class SiteScene {
     this.centre = ringCentre(ring);
     this.reach = Math.max(...ring.map(([e, n]) => Math.hypot(e - this.centre[0], n - this.centre[1])));
     this.edge = densifyRing(ring, EDGE_STEP);
-    this.eastmost = this.edge.reduce((a, p) => (p[0] > a[0] ? p : a));
     this.towerAt = innerPoint(ring);
 
     this.buildGround(grid, coverage);
@@ -272,6 +275,7 @@ export class SiteScene {
     this.buildPositions(positions);
     this.probes = new THREE.Group();
     this.scene.add(this.probes);
+    this.buildCutHandles();
 
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(container);
@@ -333,7 +337,6 @@ export class SiteScene {
   }
 
   buildSlices() {
-    const [e, n] = this.eastmost;
     this.slices = DEPTHS.map(depth => {
       const group = new THREE.Group();
       const material = this.track(new THREE.MeshLambertMaterial({ color: theme.disabled, alphaTest: 0.5, side: THREE.DoubleSide }));
@@ -344,7 +347,7 @@ export class SiteScene {
         this.track(new THREE.LineBasicMaterial({ color: theme.white, transparent: true, opacity: 0.55 })),
       );
       const label = makeLabel(`${depth} cm`, () => this.onPick?.(depth));
-      label.position.set(e + 8, this.terrain.heightAt(e, n), -n);
+      label.element.classList.add('site3d-depth-label');
       group.add(mesh, outline, label);
       group.visible = false;
       this.scene.add(group);
@@ -480,7 +483,7 @@ export class SiteScene {
       const beads = DEPTHS.map((depth, k) => {
         const value = probe.values[k];
         const material = new THREE.MeshLambertMaterial({ color: channels(Number.isFinite(value) && this.colour(value)) });
-        material.clippingPlanes = this.cutActive && this.cut?.layers ? [this.plane] : [];
+        material.clippingPlanes = this.cutActive ? [this.plane] : [];
         const bead = new THREE.Mesh(this.probeBead, material);
         bead.userData = { kind: 'probe', name: probe.name, depth, value };
         return bead;
@@ -586,26 +589,20 @@ export class SiteScene {
   }
 
   /**
-   * The cross-section, or null for none: `{ cutAt, follow, angle, layers }`. `cutAt(angle)` gives
-   * the cut line at a direction in degrees, with the samples along the block and along the
-   * landscape, `{ line, samples, landscape }`. With `follow` the direction eases towards the
-   * camera's heading each frame, else it is `angle`. The basemap and terrain on the camera's side
-   * are cut away, and the redox layers and probes too when `layers` is true.
+   * The cross-section, or null for none: `{ cutAt, angle, offset }`. `cutAt(angle)` gives the cut
+   * line at a direction in degrees, with the samples along the block and along the landscape,
+   * `{ line, samples, landscape }`; `offset` is how far it lies from the polygon's centre, as a
+   * share of its reach. The basemap, terrain, redox layers and probes on the camera's side are cut away.
    */
   setCut(cut) {
     this.cut = cut;
     this.clearCut();
     this.cutActive = false;
     if (!cut) {
-      this.cutAngle = null;
       this.onCutSamples?.(null);
       return;
     }
-    this.stepCut(performance.now());
-  }
-
-  wantedCutAngle() {
-    return this.cut.follow ? viewCutAngle(this.currentView().azimuth) : this.cut.angle;
+    this.stepCut();
   }
 
   clearCut() {
@@ -621,36 +618,31 @@ export class SiteScene {
     drop(this.context, this.landscapeFace);
     this.curtain = null;
     this.landscapeFace = null;
+    this.showCutHandles(false);
     this.clipWith(false);
   }
 
   clipWith(on) {
     const planes = on ? [this.plane] : [];
-    const layerPlanes = on && this.cut?.layers ? [this.plane] : [];
-    for (const material of this.clippable.basemap) material.clippingPlanes = planes;
-    for (const material of this.clippable.layers) material.clippingPlanes = layerPlanes;
+    for (const material of [...this.clippable.basemap, ...this.clippable.layers]) material.clippingPlanes = planes;
     this.probes.traverse(o => {
-      if (o.isMesh) o.material.clippingPlanes = layerPlanes;
+      if (o.isMesh) o.material.clippingPlanes = planes;
     });
   }
 
-  // The cut at the current angle: the plane, the layers' cut face when they are cut, the landscape's.
+  // The cut: the plane, its handles, the layers' cut face and the landscape's, and the profile.
   buildCut() {
     this.clearCut();
-    const { line, samples, landscape } = this.cut.cutAt(this.cutAngle);
-    this.builtAngle = this.cutAngle;
-    this.builtAt = performance.now();
-    this.cutSamples = line ? samples : null;
-    this.profileDue = true;
+    const { line, samples, landscape } = this.cut.cutAt(this.cut.angle);
+    this.onCutSamples?.(line ? samples : null);
     if (!line) return;
     this.placePlane(line);
+    this.placeHandles(line);
+    this.showCutHandles(true);
     this.clipWith(true);
-    // The layers' own cut face shows only when they are cut; left whole, they show themselves.
-    if (this.cut.layers) {
-      this.curtain = this.buildCurtain(samples);
-      this.scene.add(this.curtain.group);
-      this.layoutCurtain();
-    }
+    this.curtain = this.buildCurtain(samples);
+    this.scene.add(this.curtain.group);
+    this.layoutCurtain();
     if (landscape) {
       this.landscapeFace = this.buildLandscapeFace(landscape);
       this.context.add(this.landscapeFace);
@@ -665,9 +657,193 @@ export class SiteScene {
     if (this.plane.distanceToPoint(this.camera.position) > 0) this.plane.negate();
   }
 
-  // Each frame the cut's angle eases towards the wanted one: the plane turns with it, the faces
-  // follow once it has moved a degree, and the profile is sent once they have stood still.
-  stepCut(now) {
+  /**
+   * The handles on the cut's stretch over the polygon: two move handles, dragged over the ground
+   * to slide the cut nearer or further, and a turn handle at each end, dragged round to turn the
+   * cut about the middle of the stretch. Each is a slider for the keyboard too.
+   */
+  buildCutHandles() {
+    const ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const raycaster = new THREE.Raycaster();
+    // Where the pointer meets the level plane through the grabbed handle, in local metres.
+    const groundAt = event => {
+      const box = this.renderer.domElement.getBoundingClientRect();
+      const ndc = new THREE.Vector2(
+        ((event.clientX - box.left) / box.width) * 2 - 1,
+        -((event.clientY - box.top) / box.height) * 2 + 1,
+      );
+      raycaster.setFromCamera(ndc, this.camera);
+      const hit = raycaster.ray.intersectPlane(ground, new THREE.Vector3());
+      return hit && [hit.x, -hit.z];
+    };
+    const handle = ({ kind, label, title, icon, min, max, grab, drag, key }) => {
+      const element = document.createElement('div');
+      element.className = `site3d-cut-handle site3d-cut-${kind}`;
+      element.tabIndex = 0;
+      element.title = title;
+      element.setAttribute('role', 'slider');
+      element.setAttribute('aria-label', label);
+      element.setAttribute('aria-valuemin', String(min));
+      element.setAttribute('aria-valuemax', String(max));
+      element.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${icon}</svg>`;
+      const object = new CSS2DObject(element);
+      object.visible = false;
+      object.userData = { icon: element.firstChild, turn: null };
+      let held = null;
+      const press = event => {
+        if (!this.steering || this.flight || event.button > 0 || !this.cut) return;
+        event.preventDefault();
+        event.stopPropagation();
+        element.focus();
+        ground.constant = -object.position.y;
+        const at = groundAt(event);
+        if (!at) return;
+        element.setPointerCapture(event.pointerId);
+        held = { pointer: event.pointerId, ...grab(at) };
+        this.dragging = true;
+        this.onHover?.(null);
+        this.container.classList.add('site3d-cut-dragging');
+      };
+      const move = event => {
+        if (event.pointerId !== held?.pointer || !this.cut) return;
+        const at = groundAt(event);
+        if (at) drag(at, held, event);
+      };
+      const release = event => {
+        if (event.pointerId !== held?.pointer) return;
+        held = null;
+        this.dragging = false;
+        if (element.hasPointerCapture(event.pointerId)) element.releasePointerCapture(event.pointerId);
+        this.container.classList.remove('site3d-cut-dragging');
+      };
+      const keys = event => {
+        const step = { ArrowUp: 1, ArrowRight: 1, PageUp: 4, ArrowDown: -1, ArrowLeft: -1, PageDown: -4 }[event.key];
+        if (!step || !this.cut) return;
+        event.preventDefault();
+        event.stopPropagation();
+        key(step);
+      };
+      element.addEventListener('pointerdown', press);
+      element.addEventListener('pointermove', move);
+      element.addEventListener('pointerup', release);
+      element.addEventListener('pointercancel', release);
+      element.addEventListener('keydown', keys);
+      this.scene.add(object);
+      return object;
+    };
+
+    // Moving keeps the direction and puts the cut through the pointer.
+    const mover = () =>
+      handle({
+        kind: 'move',
+        label: 'Cut position',
+        title: 'Drag to move the cross-section',
+        icon: MOVE_ICON,
+        min: -100,
+        max: 100,
+        grab: () => ({}),
+        drag: at => this.moveCut(this.cut.angle, offsetThrough(this.centre, at, this.cut.angle) / this.reach),
+        key: step => this.moveCut(this.cut.angle, this.cut.offset + step * MOVE_KEY_STEP),
+      });
+    // Turning keeps the middle of the stretch on the cut; the direction keeps the angle between the
+    // pointer and the cut it had when grabbed, so the cut does not jump to the pointer.
+    const turner = () =>
+      handle({
+        kind: 'turn',
+        label: 'Cut direction',
+        title: 'Drag to turn the cross-section; hold Shift to snap',
+        icon: TURN_ICON,
+        min: 0,
+        max: 359,
+        grab: at => ({ pivot: this.cutPivot, lag: bearing(this.cutPivot, at) - this.cut.angle }),
+        drag: (at, { pivot, lag }, event) => {
+          if (Math.hypot(at[0] - pivot[0], at[1] - pivot[1]) < 1) return;
+          let angle = bearing(pivot, at) - lag;
+          if (event.shiftKey) angle = Math.round(angle / TURN_SNAP) * TURN_SNAP;
+          this.turnCut(angle, pivot);
+        },
+        key: step => this.turnCut(this.cut.angle + step * TURN_KEY_STEP, this.cutPivot),
+      });
+    this.moveHandles = MOVE_SHARES.map(mover);
+    this.turnHandles = [turner(), turner()];
+    this.cutHandles = [...this.moveHandles, ...this.turnHandles];
+  }
+
+  showCutHandles(on) {
+    for (const object of this.cutHandles) object.visible = on;
+  }
+
+  moveCut(angle, offset) {
+    const share = Math.min(1, Math.max(-1, offset));
+    const turned = ((angle % 360) + 360) % 360;
+    if (Math.abs(share - this.cut.offset) > 1e-4 || Math.abs(turned - this.cut.angle) > 1e-3) {
+      this.onCut?.({ angle: turned, offset: share });
+    }
+  }
+
+  turnCut(angle, pivot) {
+    this.moveCut(angle, offsetThrough(this.centre, pivot, angle) / this.reach);
+  }
+
+  // The handles on the stretch of the cut line over the polygon, or on the whole line when it
+  // misses the polygon, just above the ground; the middle of the stretch is what the cut turns about.
+  placeHandles(line) {
+    const [fx, fy] = line.from;
+    const [tx, ty] = line.to;
+    const [enter, leave] = ringSpan(this.ring, line.from, line.to) ?? [0, 1];
+    const at = t => [fx + (tx - fx) * t, fy + (ty - fy) * t];
+    const place = (object, [e, n]) => object.position.set(e, this.terrain.heightAt(e, n) + HANDLE_LIFT, -n);
+    this.cutNormal = line.normal;
+    this.cutPivot = at((enter + leave) / 2);
+    this.cutEnds = [at(enter), at(leave)];
+    MOVE_SHARES.forEach((share, k) => place(this.moveHandles[k], at(enter + (leave - enter) * share)));
+    place(this.turnHandles[0], at(enter));
+    place(this.turnHandles[1], at(leave));
+    const offset = String(Math.round(this.cut.offset * 100));
+    const angle = Math.round(this.cut.angle) % 360;
+    for (const object of this.moveHandles) object.element.setAttribute('aria-valuenow', offset);
+    for (const object of this.turnHandles) {
+      object.element.setAttribute('aria-valuenow', String(angle));
+      object.element.setAttribute('aria-valuetext', `${angle} degrees`);
+    }
+  }
+
+  // The move handles' arrows point along the cut's normal as the screen shows it there.
+  aimMoveHandles() {
+    if (!this.cutNormal) return;
+    const [nx, ny] = this.cutNormal;
+    const width = this.container.clientWidth || 1;
+    const height = this.container.clientHeight || 1;
+    for (const object of this.moveHandles) {
+      if (!object.visible) continue;
+      const a = object.position.clone().project(this.camera);
+      const b = object.position.clone().add(new THREE.Vector3(nx, 0, -ny)).project(this.camera);
+      const degrees = (Math.atan2(-(b.y - a.y) * height, (b.x - a.x) * width) * 180) / Math.PI;
+      const { icon, turn } = object.userData;
+      if (turn != null && Math.abs(degrees - turn) < 0.5) continue;
+      object.userData.turn = degrees;
+      icon.style.transform = `rotate(${degrees}deg)`;
+    }
+  }
+
+  // The depth labels sit beside the slices' right-hand edge as the screen shows it, on the part the
+  // cut keeps, so they stay by the slices whichever way the view faces.
+  placeDepthLabels() {
+    const point = new THREE.Vector3();
+    const best = labelCorner({
+      ring: this.ring,
+      ends: this.cutActive ? this.cutEnds : [],
+      kept: ([e, n]) => !this.cutActive || this.plane.distanceToPoint(point.set(e, 0, -n)) >= 0,
+      screenX: ([e, n]) => point.set(e, this.terrain.heightAt(e, n), -n).project(this.camera).x,
+    });
+    if (!best || best === this.labelCorner) return;
+    this.labelCorner = best;
+    const [e, n] = best;
+    for (const slice of this.slices) slice.label.position.set(e, this.terrain.heightAt(e, n), -n);
+  }
+
+  // The cut shows once the view tilts and goes as it flattens.
+  stepCut() {
     if (!this.cut) return;
     const { polar } = this.currentView();
     if (polar <= (this.cutActive ? CUT_OFF_TILT : CUT_ON_TILT)) {
@@ -675,30 +851,11 @@ export class SiteScene {
       if (this.cutActive) {
         this.clearCut();
         this.cutActive = false;
-        this.cutAngle = null;
-        this.cutSamples = null;
-        this.profileDue = true;
+        this.onCutSamples?.(null);
       }
     } else if (!this.cutActive) {
       this.cutActive = true;
-      if (this.cutAngle == null || !this.cut.follow) this.cutAngle = this.wantedCutAngle();
       this.buildCut();
-      this.profileNow = true;
-    } else {
-      const gap = turnDegrees(this.cutAngle, this.wantedCutAngle());
-      if (Math.abs(gap) > 0.05) {
-        this.cutAngle = (this.cutAngle + gap * CUT_EASE + 360) % 360;
-        if (Math.abs(turnDegrees(this.builtAngle, this.cutAngle)) > CUT_REBUILD_DEGREES) this.buildCut();
-        else {
-          const { line } = this.cut.cutAt(this.cutAngle, false);
-          if (line) this.placePlane(line);
-        }
-      }
-    }
-    if (this.profileDue && (this.profileNow || now - this.builtAt >= PROFILE_SETTLE_MS)) {
-      this.profileDue = false;
-      this.profileNow = false;
-      this.onCutSamples?.(this.cutSamples);
     }
   }
 
@@ -956,7 +1113,9 @@ export class SiteScene {
     else this.controls.update();
     this.followTilt();
     this.stepPeel();
-    this.stepCut(now);
+    this.stepCut();
+    this.aimMoveHandles();
+    this.placeDepthLabels();
     this.scaleTower();
     if (this.cut && this.plane.distanceToPoint(this.camera.position) > 0) this.plane.negate();
     if (this.pointer?.moved && !this.flight && !this.dragging && now - this.pickedAt >= PICK_MS) {
@@ -986,7 +1145,7 @@ export class SiteScene {
     for (const hit of raycaster.intersectObjects(targets, false)) {
       const { kind } = hit.object.userData;
       const layered = kind === 'slice' || kind === 'probe' || hit.object.parent?.parent === this.probes;
-      const cutAway = this.cutActive && (!layered || this.cut?.layers);
+      const cutAway = this.cutActive;
       if (cutAway && this.plane.distanceToPoint(hit.point) < 0) continue;
       const e = hit.point.x;
       const n = -hit.point.z;

@@ -9,6 +9,14 @@ const open3D = async page => {
     await page.locator(SITE_3D.hint).waitFor();
 };
 
+const crossSectionButton = page => page.locator(PANELS.rail).getByRole('button', { name: /Cross-section/ });
+
+const openCut = async page => {
+    await open3D(page);
+    await crossSectionButton(page).click();
+    await page.locator(SITE_3D.profile).waitFor();
+};
+
 const boxesOf = async (page, selectors) => {
     const out = {};
     for (const [name, selector] of Object.entries(selectors)) {
@@ -19,11 +27,9 @@ const boxesOf = async (page, selectors) => {
 };
 
 for (const size of WINDOW_SIZES.slice(0, 2)) {
-    test(`the 3D view's panels do not overlap at ${size.width}x${size.height}, with the cross-section on`, async ({ browser }) => {
+    test(`the 3D view's panels do not overlap at ${size.width}x${size.height}, with the cross-section shown`, async ({ browser }) => {
         const page = await openSite(browser, size);
-        await open3D(page);
-        await page.locator(SITE_3D.card).getByText('Cross-section').click();
-        await page.locator(SITE_3D.profile).waitFor();
+        await openCut(page);
         const boxes = await boxesOf(page, {
             rail: PANELS.rail,
             bottomBar: PANELS.bottomBar,
@@ -38,6 +44,87 @@ for (const size of WINDOW_SIZES.slice(0, 2)) {
         await page.close();
     });
 }
+
+// The handles are placed by the scene's frame loop, so a drag's last move lands a frame or two later.
+const centreOf = async locator => {
+    await locator.page().evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))));
+    const box = await locator.boundingBox();
+    return [box.x + box.width / 2, box.y + box.height / 2];
+};
+
+const dragBy = async (page, locator, [dx, dy]) => {
+    const [x, y] = await centreOf(locator);
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + dx, y + dy, { steps: 8 });
+    await page.mouse.up();
+};
+
+test('the cross-section is off as the 3D view opens and the rail turns it on, with nothing for it in the card', async ({ browser }) => {
+    const page = await openSite(browser, WINDOW_SIZES[0]);
+    await open3D(page);
+    await expect(crossSectionButton(page)).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.locator(SITE_3D.profile)).toHaveCount(0);
+    await expect(page.locator(SITE_3D.cutMove).first()).toBeHidden();
+
+    await crossSectionButton(page).click();
+    await expect(crossSectionButton(page)).toHaveAttribute('aria-pressed', 'true');
+    await page.locator(SITE_3D.profile).waitFor();
+    await expect(page.locator(SITE_3D.cutMove).first()).toBeVisible();
+
+    const card = page.locator(SITE_3D.card);
+    for (const text of ['Cross-section', 'Cut the layers too', 'Follow the view', 'Direction']) {
+        await expect(card.getByText(text, { exact: true })).toHaveCount(0);
+    }
+    await expect(card.getByRole('slider', { name: /Cut/ })).toHaveCount(0);
+    await page.close();
+});
+
+test('the cross-section moves by either of its move handles, which stay put under the pointer', async ({ browser }) => {
+    const page = await openSite(browser, WINDOW_SIZES[0]);
+    await openCut(page);
+    const handles = page.locator(SITE_3D.cutMove);
+    await expect(handles).toHaveCount(2);
+    const handle = handles.first();
+    await expect(handle).toHaveCSS('cursor', 'grab');
+    await expect(handle).toHaveAttribute('aria-valuenow', '0');
+    const resting = await handle.boundingBox();
+    await page.mouse.move(...(await centreOf(handle)));
+    expect(await handle.boundingBox()).toEqual(resting);
+
+    await dragBy(page, handle, [0, -60]);
+    const pushed = Number(await handle.getAttribute('aria-valuenow'));
+    expect(pushed).toBeGreaterThan(0);
+    await expect(handles.last()).toHaveAttribute('aria-valuenow', String(pushed));
+
+    await handles.last().press('ArrowDown');
+    await expect(handle).toHaveAttribute('aria-valuenow', String(pushed - 5));
+    await page.close();
+});
+
+test('the cross-section turns by the handles at its ends, snapping to 15 degrees with Shift', async ({ browser }) => {
+    const page = await openSite(browser, WINDOW_SIZES[0]);
+    await openCut(page);
+    const handles = page.locator(SITE_3D.cutTurn);
+    await expect(handles).toHaveCount(2);
+    const handle = handles.first();
+    const opening = Number(await handle.getAttribute('aria-valuenow'));
+
+    await dragBy(page, handle, [0, 80]);
+    const turned = Number(await handle.getAttribute('aria-valuenow'));
+    expect(turned).not.toBe(opening);
+    await expect(handles.last()).toHaveAttribute('aria-valuenow', String(turned));
+
+    await page.keyboard.down('Shift');
+    await dragBy(page, handles.last(), [0, -50]);
+    await page.keyboard.up('Shift');
+    expect(Number(await handle.getAttribute('aria-valuenow')) % 15).toBe(0);
+
+    const snapped = Number(await handle.getAttribute('aria-valuenow'));
+    await handle.press('ArrowRight');
+    await expect(handle).toHaveAttribute('aria-valuenow', String((snapped + 5) % 360));
+    await page.close();
+});
 
 test('the 3D layers draw over the map, and turning them off hands back to the map', async ({ browser }) => {
     const page = await openSite(browser, WINDOW_SIZES[0]);

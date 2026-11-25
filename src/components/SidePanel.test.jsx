@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import SidePanel from './SidePanel';
 import { SelectionProvider, useSelection } from '../contexts/SelectionContext';
+import { ViewProvider, useView } from '../contexts/ViewContext';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -84,5 +85,56 @@ describe('SidePanel depth layers', () => {
     await click(buttons[1]);
     expect(selected()).toBe('covered');
     expect(container.querySelector('.popup')).toBeNull();
+  });
+});
+
+describe('SidePanel cross-section', () => {
+  let container;
+  let root;
+
+  const CrossSection = () => <output data-testid="cross-section">{String(useView().crossSection)}</output>;
+  const render = async start3D => {
+    await act(async () => {
+      root.render(
+        <ViewProvider start3D={() => start3D}>
+          <SelectionProvider sensors={[]} initial={{ variable: 'redox', option: 5 }}>
+            <SidePanel />
+            <CrossSection />
+          </SelectionProvider>
+        </ViewProvider>,
+      );
+    });
+  };
+  const toggle = () => [...container.querySelectorAll('button')].find(b => b.textContent.includes('Cross-section'));
+  const shown = () => container.querySelector('[data-testid="cross-section"]').textContent;
+
+  beforeEach(() => {
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it('offers no cross-section on the 2D map', async () => {
+    await render(false);
+    expect(toggle()).toBeUndefined();
+  });
+
+  it('opens under the 3D layers button in 3D, off until pressed', async () => {
+    await render(true);
+    const layers = [...container.querySelectorAll('button')].find(b => b.textContent.includes('3D layers'));
+    expect(layers.nextElementSibling).toBe(toggle());
+    expect(toggle().getAttribute('aria-pressed')).toBe('false');
+    expect(toggle().textContent).toContain('Off');
+    expect(shown()).toBe('false');
+
+    await act(async () => toggle().dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    expect(toggle().getAttribute('aria-pressed')).toBe('true');
+    expect(toggle().textContent).toContain('On');
+    expect(shown()).toBe('true');
   });
 });

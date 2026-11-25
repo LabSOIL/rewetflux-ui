@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { cutLine, densifyRing, innerLonLat, innerPoint, insideRing, localFrame, ringCentre, viewCutAngle } from './geo';
+import {
+  bearing,
+  cutLine,
+  densifyRing,
+  innerLonLat,
+  innerPoint,
+  insideRing,
+  labelCorner,
+  localFrame,
+  offsetThrough,
+  ringCentre,
+  ringSpan,
+  viewCutAngle,
+} from './geo';
 import { terrainModel } from './terrain';
 
 describe('localFrame', () => {
@@ -100,6 +113,68 @@ describe('cutLine', () => {
 
   it('is null when the line misses the box', () => {
     expect(cutLine([0, 0], 0, 40, 50, 30)).toBeNull();
+  });
+});
+
+describe('ringSpan', () => {
+  const ring = [[10, 0], [30, 0], [30, 10], [10, 10]];
+
+  it('gives the shares along a line where it enters and leaves the ring', () => {
+    const [enter, leave] = ringSpan(ring, [0, 5], [40, 5]);
+    expect(enter).toBeCloseTo(0.25, 9);
+    expect(leave).toBeCloseTo(0.75, 9);
+  });
+
+  it('spans from the first crossing to the last over a ring with a notch', () => {
+    const notched = [[0, 0], [10, 0], [10, 10], [6, 10], [6, 2], [4, 2], [4, 10], [0, 10]];
+    const [enter, leave] = ringSpan(notched, [10, 5], [-10, 5]);
+    expect(enter).toBeCloseTo(0, 9);
+    expect(leave).toBeCloseTo(0.5, 9);
+  });
+
+  it('is null for a line that misses the ring', () => {
+    expect(ringSpan(ring, [0, 20], [40, 20])).toBeNull();
+  });
+});
+
+describe('turning the cut', () => {
+  it('reads a bearing anticlockwise from east, from 0 up to 360', () => {
+    expect(bearing([1, 1], [5, 1])).toBeCloseTo(0, 9);
+    expect(bearing([1, 1], [1, 5])).toBeCloseTo(90, 9);
+    expect(bearing([1, 1], [1, -3])).toBeCloseTo(270, 9);
+  });
+
+  it('keeps the point it turns about on the cut, whatever the direction', () => {
+    const centre = [3, -2];
+    const pivot = [20, 12];
+    for (const angle of [0, 37, 90, 145, 260]) {
+      const line = cutLine(centre, angle, offsetThrough(centre, pivot, angle), 100, 100);
+      const [fx, fy] = line.from;
+      const [tx, ty] = line.to;
+      const across = (tx - fx) * (pivot[1] - fy) - (ty - fy) * (pivot[0] - fx);
+      expect(Math.abs(across) / Math.hypot(tx - fx, ty - fy)).toBeLessThan(1e-9);
+    }
+  });
+
+  it('gives no offset to a cut turned about the centre itself', () => {
+    expect(offsetThrough([4, 4], [4, 4], 63)).toBeCloseTo(0, 9);
+  });
+});
+
+describe('labelCorner', () => {
+  const ring = [[0, 0], [10, 0], [10, 10], [0, 10]];
+  // A view looking north, so the screen's right is east, and one looking south, where it is west.
+  const facingNorth = ([e]) => e;
+  const facingSouth = ([e]) => -e;
+
+  it('picks the corner furthest right on the screen, whichever way the view faces', () => {
+    expect(labelCorner({ ring, screenX: facingNorth })[0]).toBe(10);
+    expect(labelCorner({ ring, screenX: facingSouth })[0]).toBe(0);
+  });
+
+  it('passes over the corners the cut removes and takes an end of the cut instead', () => {
+    const corner = labelCorner({ ring, ends: [[5, 0], [5, 10]], kept: ([e]) => e <= 5, screenX: facingNorth });
+    expect(corner[0]).toBe(5);
   });
 });
 

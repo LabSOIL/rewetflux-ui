@@ -8,6 +8,8 @@ export default defineConfig({
     plugins: [react()],
     server: {
         host: true,
+        // The dev stack serves this through traefik under the hostname rewetflux.
+        allowedHosts: ['rewetflux'],
     },
     base: './',
     build: {

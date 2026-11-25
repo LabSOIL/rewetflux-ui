@@ -29,6 +29,8 @@ export const SITE_3D = {
     hint: '.site3d-hint',
     profile: '.site3d-profile',
     nav: '.site3d-nav',
+    cutMove: '.site3d-cut-move',
+    cutTurn: '.site3d-cut-turn',
 };
 export const TILE_URL = /wmts20\.geo\.admin\.ch/;
 

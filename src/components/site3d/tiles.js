@@ -12,8 +12,8 @@ const loadImage = url =>
 
 /**
  * A canvas of basemap layers over Web Mercator bounds [x0, y0, x1, y1] at `zoom`, one canvas
- * pixel per tile pixel, on a `blank` colour. Each layer is drawn from its own deepest zoom up to `zoom`; a base is
- * painted over the last, an overlay is multiplied onto it. A tile that fails to load stays blank.
+ * pixel per tile pixel, on a `blank` colour. Each layer is drawn from its own deepest zoom up to `zoom`,
+ * over the last. A tile that fails to load stays blank.
  */
 export async function basemapCanvas(layers, [x0, y0, x1, y1], zoom, blank) {
   const pixel = x => ((x + WORLD / 2) / WORLD) * TILE * 2 ** zoom;
@@ -39,11 +39,9 @@ export async function basemapCanvas(layers, [x0, y0, x1, y1], zoom, blank) {
         tiles.push(loadImage(url).then(image => ({ image, tx, ty })));
       }
     }
-    context.globalCompositeOperation = layer.kind === 'overlay' ? 'multiply' : 'source-over';
     for (const { image, tx, ty } of await Promise.all(tiles)) {
       if (image) context.drawImage(image, tx * size - left, ty * size - top, size, size);
     }
   }
-  context.globalCompositeOperation = 'source-over';
   return canvas;
 }

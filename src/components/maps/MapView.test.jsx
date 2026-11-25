@@ -53,13 +53,13 @@ describe('MapView', () => {
     expect(container.querySelector('.leaflet-top.leaflet-left .leaflet-control-zoom')).toBeNull();
   });
 
-  it('lists the basemap layers in the map card', () => {
-    const baseNames = [...container.querySelectorAll('.map-card-base label')]
-      .map(label => label.textContent.trim());
-    const overlayNames = [...container.querySelectorAll('.map-card-overlays label')]
-      .map(label => label.textContent.trim());
-    expect(baseNames).toEqual(['Topo', 'Aerial']);
-    expect(overlayNames).toEqual(['LiDAR / Relief']);
+  it('offers the basemap layers in the map card as thumbnails of their own tiles, with no overlays', () => {
+    const choices = [...container.querySelectorAll('.map-card-base label')];
+    expect(choices.map(label => label.textContent.trim())).toEqual(['Topo', 'Aerial']);
+    const thumbnails = choices.map(label => label.querySelector('.map-card-thumbnail').style.backgroundImage);
+    expect(thumbnails[0]).toContain('ch.swisstopo.pixelkarte-farbe');
+    expect(thumbnails[1]).toContain('ch.swisstopo.swissimage');
+    expect(container.querySelector('.map-card input[type="checkbox"]')).toBeNull();
   });
 
   it('holds the basemap chooser and the legend in one card, a separator between them', () => {

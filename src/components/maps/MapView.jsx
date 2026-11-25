@@ -18,14 +18,13 @@ const PREPARE_AFTER_MS = 1500;
 function Prepare3D() {
   const view = useView();
   const baseId = view?.baseId;
-  const overlayIds = view?.overlayIds;
   useEffect(() => {
     if (!baseId || typeof window.WebGLRenderingContext === 'undefined') return undefined;
     const timer = setTimeout(() => {
-      import('../site3d/Site3D').then(site => site.prepare(baseId, overlayIds));
+      import('../site3d/Site3D').then(site => site.prepare(baseId));
     }, PREPARE_AFTER_MS);
     return () => clearTimeout(timer);
-  }, [baseId, overlayIds]);
+  }, [baseId]);
   return null;
 }
 
