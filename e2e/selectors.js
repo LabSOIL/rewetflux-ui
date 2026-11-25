@@ -3,7 +3,7 @@
 export const PANELS = {
     rail: '.side-panel',
     popup: '.popup',
-    zoom: '.leaflet-control-zoom',
+    zoom: '.view-controls',
     layers: '.leaflet-control-layers',
     card: '.map-card',
     logos: '.map-logos',
@@ -29,7 +29,6 @@ export const SITE_3D = {
     card: '.site3d-card',
     open: '.site3d[data-phase="open"]',
     profile: '.site3d-profile',
-    nav: '.site3d-nav',
     cutMove: '.site3d-cut-move',
     cutTurn: '.site3d-cut-turn',
 };

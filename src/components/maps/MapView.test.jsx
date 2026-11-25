@@ -14,11 +14,13 @@ const SITE = {
 describe('MapView', () => {
   let container;
   let root;
+  let recentred;
 
   beforeEach(async () => {
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
+    recentred = [];
     await act(async () => {
       root.render(
         <MapView
@@ -26,7 +28,7 @@ describe('MapView', () => {
           activeAreaId={null}
           selectedData="Redox"
           selectArea={() => {}}
-          setShouldRecenter={() => {}}
+          setShouldRecenter={value => recentred.push(value)}
           shouldRecenter={false}
           extent={SITE.extent}
           centroid={SITE.centroid}
@@ -48,9 +50,30 @@ describe('MapView', () => {
     expect(container.querySelector('.leaflet-control-scale')).not.toBeNull();
   });
 
-  it('places the zoom control at the bottom right', () => {
-    expect(container.querySelector('.leaflet-bottom.leaflet-right .leaflet-control-zoom')).not.toBeNull();
-    expect(container.querySelector('.leaflet-top.leaflet-left .leaflet-control-zoom')).toBeNull();
+  it('draws no zoom box on a Shift-drag', () => {
+    const map = container.querySelector('.leaflet-container');
+    const mouse = (type, x) =>
+      new MouseEvent(type, { bubbles: true, shiftKey: true, button: 0, which: 1, clientX: x, clientY: x });
+    map.dispatchEvent(mouse('mousedown', 10));
+    document.dispatchEvent(mouse('mousemove', 60));
+    expect(container.querySelector('.leaflet-zoom-box')).toBeNull();
+    document.dispatchEvent(mouse('mouseup', 60));
+  });
+
+  const controls = () => container.querySelector('.map-view > .view-controls');
+  const control = name => controls().querySelector(`button[aria-label="${name}"]`);
+
+  it('keeps the view controls outside the map, a recentre button above Zoom in and Zoom out', () => {
+    expect(controls().closest('.leaflet-container')).toBeNull();
+    const names = [...controls().querySelectorAll('button')].map(b => b.getAttribute('aria-label'));
+    expect(names).toEqual(['Recentre on the site', 'Zoom in', 'Zoom out']);
+    expect(container.querySelector('.leaflet-control-zoom')).toBeNull();
+  });
+
+  it('shows no compass on the 2D map, which is always north up, and recentres on the site', async () => {
+    expect(controls().querySelector('.view-controls-north')).toBeNull();
+    await act(async () => control('Recentre on the site').click());
+    expect(recentred).toEqual([true]);
   });
 
   const switcher = () => container.querySelector('.map-view > .map-basemap');

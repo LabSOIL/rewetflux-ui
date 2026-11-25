@@ -37,7 +37,7 @@ for (const size of WINDOW_SIZES.slice(0, 2)) {
             basemap: PANELS.basemap,
             card: SITE_3D.card,
             profile: SITE_3D.profile,
-            nav: SITE_3D.nav,
+            nav: PANELS.zoom,
         });
         expect(Object.keys(boxes)).toHaveLength(7);
         expect(overlaps(boxes)).toEqual([]);
@@ -135,6 +135,33 @@ test('the cross-section turns by the handles at its ends, snapping to 15 degrees
     const snapped = Number(await handle.getAttribute('aria-valuenow'));
     await handle.press('ArrowRight');
     await expect(handle).toHaveAttribute('aria-valuenow', String((snapped + 5) % 360));
+    await page.close();
+});
+
+// The compass needle's turn and tilt, in radians, as its transform sets them.
+const needleOf = async page => {
+    const transform = await page.locator(`${PANELS.zoom} .view-controls-reset svg`).evaluate(el => el.style.transform);
+    const [, tilt = '0'] = transform.match(/rotateX\(([-\d.e]+)rad\)/) ?? [];
+    const [, turn = '0'] = transform.match(/rotateZ\(([-\d.e]+)rad\)/) ?? [];
+    return { tilt: Number(tilt), turn: Number(turn) };
+};
+
+test('Reset view turns the 3D view back north up at its opening tilt, from the controls the map uses', async ({ browser }) => {
+    const page = await openSite(browser, WINDOW_SIZES[0]);
+    const inMap = await page.locator(PANELS.zoom).boundingBox();
+    await open3D(page);
+    expect(await page.locator(PANELS.zoom).boundingBox()).toEqual(inMap);
+    const opening = await needleOf(page);
+
+    await page.locator(SITE_3D.canvas).focus();
+    for (let k = 0; k < 12; k++) await page.keyboard.press('Shift+ArrowLeft');
+    for (let k = 0; k < 4; k++) await page.keyboard.press('Shift+ArrowUp');
+    const turned = await needleOf(page);
+    expect(Math.abs(turned.turn - opening.turn)).toBeGreaterThan(0.5);
+
+    await page.locator(PANELS.zoom).getByRole('button', { name: 'Reset view' }).click();
+    await expect.poll(async () => Math.abs((await needleOf(page)).turn), { timeout: 3000 }).toBeLessThan(0.01);
+    expect(Math.abs((await needleOf(page)).tilt - opening.tilt)).toBeLessThan(0.05);
     await page.close();
 });
 

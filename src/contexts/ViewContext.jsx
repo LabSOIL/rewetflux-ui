@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { DEFAULT_BASEMAP_ID } from '../components/maps/basemap';
+import { signal } from '../components/site3d/signal';
 
 const ViewContext = createContext(null);
 
@@ -41,6 +42,8 @@ export const mapViewOf = map => {
  * `returnTo` is where the scene looked as it handed back, `{ lon, lat, metresPerPixel }`;
  * `crossSection` is whether the 3D view cuts through the ground and the slices, off each time
  * the scene opens; `layerSpacing` is how far apart its slices hang, in metres per 10 cm of depth.
+ * While the scene is open it registers its camera, `{ zoomIn, zoomOut, reset }`, in `camera`,
+ * and sets its heading and tilt in radians, `[azimuth, polar]`, on the `compass` signal.
  */
 export function ViewProvider({ children, start3D = opensIn3D }) {
   const [initially3D] = useState(start3D);
@@ -62,6 +65,11 @@ export function ViewProvider({ children, start3D = opensIn3D }) {
   const registerMap = useCallback(readView => {
     mapView.current = readView;
   }, []);
+  const camera = useRef(null);
+  const registerCamera = useCallback(actions => {
+    camera.current = actions;
+  }, []);
+  const compass = useMemo(() => signal(null), []);
   const toggle3D = useCallback(() => {
     if (mode === '2d') open3D(mapView.current?.() ?? null);
     else leave3D();
@@ -90,6 +98,9 @@ export function ViewProvider({ children, start3D = opensIn3D }) {
       leave3D,
       toggle3D,
       registerMap,
+      camera,
+      registerCamera,
+      compass,
       closed,
     }),
     [
@@ -104,6 +115,8 @@ export function ViewProvider({ children, start3D = opensIn3D }) {
       leave3D,
       toggle3D,
       registerMap,
+      registerCamera,
+      compass,
       closed,
     ],
   );

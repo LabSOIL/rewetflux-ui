@@ -266,11 +266,10 @@ export default function Site3D() {
     if (variable !== 'redox') selectVariable('redox');
   }, [variable, selectVariable]);
 
-  const needle = useRef(null);
+  // The view controls steer the scene's camera while it is open, and its compass shows its heading.
+  const { registerCamera, compass } = view;
   useEffect(() => {
-    const onCompass = (azimuth, polar) => {
-      if (needle.current) needle.current.style.transform = `rotateX(${polar}rad) rotateZ(${azimuth}rad)`;
-    };
+    const onCompass = (azimuth, polar) => compass.set([azimuth, polar]);
     // The distance at which the scene shows the ground at the map's scale at the flat zoom.
     const lat = model.terrain.frame.toLonLat(...model.centre)[1];
     const flat =
@@ -287,15 +286,22 @@ export default function Site3D() {
     });
     site.show(site.topDownView(start.current.centre, start.current.height));
     scene.current = site;
+    registerCamera({
+      zoomIn: () => site.nudge({ zoom: 1 / ZOOM_STEP }),
+      zoomOut: () => site.nudge({ zoom: ZOOM_STEP }),
+      reset: () => site.resetView(),
+    });
     let disposed = false;
     loadTower().then(geometry => {
       if (geometry && !disposed) site.setTower(geometry);
     });
     return () => {
       disposed = true;
+      registerCamera(null);
+      compass.set(null);
       site.dispose();
     };
-  }, [model, selectOption, hover, profile]);
+  }, [model, selectOption, hover, profile, registerCamera, compass]);
 
   // The block's and the surroundings' basemaps; once drawn, the shaders compile and the textures
   // upload before the scene shows, so its first frames do not stall.
@@ -394,30 +400,6 @@ export default function Site3D() {
         </div>
         {cutOn && <CutProfile profile={profile} colour={rasters.colour} base={model.terrain.base} />}
         <HoverTip hover={hover} />
-        <div className="site3d-nav" role="group" aria-label="Camera">
-          <button
-            type="button"
-            aria-label="Zoom in"
-            title="Zoom in"
-            onClick={() => scene.current.nudge({ zoom: 1 / ZOOM_STEP })}
-          >
-            +
-          </button>
-          <button
-            type="button"
-            aria-label="Zoom out"
-            title="Zoom out"
-            onClick={() => scene.current.nudge({ zoom: ZOOM_STEP })}
-          >
-            −
-          </button>
-          <button type="button" aria-label="Face north" title="Face north" onClick={() => scene.current.faceNorth()}>
-            <svg ref={needle} className="site3d-compass" viewBox="0 0 24 24" aria-hidden="true">
-              <path className="site3d-compass-north" d="M12 2 L16 12 L8 12 Z" />
-              <path className="site3d-compass-south" d="M12 22 L16 12 L8 12 Z" />
-            </svg>
-          </button>
-        </div>
         <div className="site3d-attribution">
           Terrain and basemap &copy;{' '}
           <a href="https://www.swisstopo.admin.ch/" target="_blank" rel="noopener noreferrer">

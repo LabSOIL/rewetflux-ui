@@ -35,6 +35,7 @@ const TURN_ICON =
 // Hovering picks at most this often, and never while the view is dragged.
 const PICK_MS = 100;
 const FLY_MS = 1000;
+const RESET_MS = 800;
 const OBLIQUE = { polar: 0.9, azimuth: -0.38 };
 // The cut's direction as the scene opens: across the opening view's line of sight, in whole degrees.
 export const OPENING_CUT_ANGLE = Math.round(viewCutAngle(OBLIQUE.azimuth));
@@ -1048,9 +1049,11 @@ export class SiteScene {
     return TILTED * smooth(clamp01((this.flat - radius) / (this.flat * (1 - TILT_SPAN))));
   }
 
-  /** Turns the view north up, keeping its tilt. */
-  faceNorth() {
-    if (this.steering && !this.flight) this.flyTo({ ...this.currentView(), azimuth: 0 }, null, 600);
+  /** Flies back to the opening view of the site, turned north up; the tilt follows the zoom again. */
+  resetView() {
+    if (!this.steering || this.flight) return;
+    this.manual = false;
+    this.flyTo({ ...this.obliqueView(), azimuth: 0 }, null, RESET_MS);
   }
 
   // The slices drop and the surroundings dim as the view tilts; the compass follows the camera.

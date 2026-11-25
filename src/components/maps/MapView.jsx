@@ -1,10 +1,11 @@
 import { Suspense, lazy, useEffect, useState } from 'react';
-import { MapContainer, Pane, ScaleControl, ZoomControl, useMap } from 'react-leaflet';
+import { MapContainer, Pane, ScaleControl, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { CatchmentLayers } from './Catchment';
 import { BaseLayers, BaseSwitcher, DEFAULT_BASEMAP_ID } from './Layers';
 import MapLogos from './MapLogos';
 import TowerMarker from './TowerMarker';
+import ViewControls from './ViewControls';
 import { MAX_ZOOM } from './basemap';
 import { applySiteOpeningView, panelReach } from './siteOpeningView';
 import { mapViewOf, useView, zoomFor } from '../../contexts/ViewContext';
@@ -79,12 +80,16 @@ export default function MapView({
   const [ownBaseId, setOwnBaseId] = useState(DEFAULT_BASEMAP_ID);
   const baseId = view?.baseId ?? ownBaseId;
   const setBaseId = view?.setBaseId ?? setOwnBaseId;
+  const [map, setMap] = useState(null);
   return (
     <div className={`map-view${view?.shown ? ' three-d' : ''}`}>
       <MapContainer
+        ref={setMap}
         bounds={extent}
         maxZoom={MAX_ZOOM}
         scrollWheelZoom
+        // Shift-drag would draw Leaflet's zoom box, which nothing in the site explains.
+        boxZoom={false}
         zoomControl={false}
         maxBoundsViscosity={1.0}
       >
@@ -94,7 +99,6 @@ export default function MapView({
         <RegisterMap />
         <BaseLayers baseId={baseId} />
         <Pane name="rasterPane" style={{ zIndex: 450 }} />
-        <ZoomControl position="bottomright" />
         <ScaleControl imperial={false} maxWidth={250} />
         <CatchmentLayers
           areas={areas}
@@ -118,6 +122,7 @@ export default function MapView({
       )}
       <MapLogos />
       <BaseSwitcher baseId={baseId} onBase={setBaseId} />
+      <ViewControls map={map} onReset={() => setShouldRecenter(true)} />
     </div>
   );
 }
