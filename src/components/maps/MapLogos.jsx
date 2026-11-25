@@ -1,5 +1,5 @@
 // The funders, one list for the map overlay. Each logo links to its site.
-const FUNDERS = [
+export const FUNDERS = [
   { href: 'https://www.epfl.ch', src: './epfl.png', alt: 'EPFL Logo' },
   { href: 'https://e4s.center/', src: './e4s.svg', alt: 'Enterprise for Society Center Logo' },
   {

@@ -1,0 +1,448 @@
+/* The landing page: a title, two cards (the site map and the project) and the funders,
+   over looping footage of the site. */
+
+.landing-page {
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
+  height: 100vh;
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 32px;
+  padding: 48px 56px 20px;
+  overflow: hidden;
+  font-family: 'Barlow', sans-serif;
+  color: var(--white);
+}
+
+/* ---------- Background ---------- */
+.landing-background {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 30% 20%, var(--backdrop) 0%, var(--backdrop-edge) 75%);
+}
+
+.landing-background video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Darkens the footage so the title and the cards read over any frame of it. */
+.landing-background-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.25) 45%, rgba(0, 0, 0, 0.6) 100%);
+}
+
+/* ---------- Header ---------- */
+.landing-header {
+  max-width: 760px;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+}
+
+.landing-brand {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 1.35rem;
+  color: var(--accent-text);
+}
+
+.landing-title {
+  margin: 0 0 18px;
+  font-size: clamp(2.4rem, 5vw, 4rem);
+  font-weight: 400;
+  line-height: 1.08;
+}
+
+.landing-title span {
+  display: block;
+}
+
+.landing-subtitle {
+  margin: 0;
+  font-size: 1.1rem;
+  line-height: 1.5;
+  color: var(--text-strong);
+}
+
+/* ---------- Cards ---------- */
+.landing-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+
+.landing-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 32px;
+  width: 100%;
+  max-width: 1100px;
+}
+
+.landing-card {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 10;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  background: var(--backdrop-edge);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(172, 216, 216, 0.18), 0 10px 30px rgba(0, 0, 0, 0.35);
+  transform: translateZ(0);
+  transition: transform 0.5s cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 0.4s ease;
+}
+
+.landing-card:first-child {
+  transform-origin: left center;
+}
+
+.landing-card:last-child {
+  transform-origin: right center;
+}
+
+.landing-card:hover,
+.landing-card:focus-visible {
+  z-index: 2;
+  transform: scale(1.06) translateZ(0);
+  box-shadow: inset 0 0 0 1px rgba(172, 216, 216, 0.55), 0 18px 44px rgba(0, 0, 0, 0.55);
+  outline: none;
+  transition-delay: 0.1s;
+}
+
+.landing-card-media {
+  position: absolute;
+  inset: 0;
+  /* Its own stacking context, so Leaflet's panes stay under the card's title and strip. */
+  z-index: 0;
+}
+
+.landing-card-media .leaflet-container {
+  position: absolute;
+  inset: 0;
+  background: var(--backdrop-edge);
+  cursor: inherit !important;
+}
+
+/* The preview is a picture: every pointer event goes to the card's link. */
+.landing-card-map .landing-card-media {
+  pointer-events: none;
+}
+
+.landing-card-about-media {
+  display: flex;
+  align-items: flex-end;
+  padding: 72px 28px 28px;
+  box-sizing: border-box;
+  background:
+    linear-gradient(160deg, rgba(0, 157, 169, 0.35) 0%, rgba(0, 0, 0, 0) 60%),
+    rgba(28, 31, 37, 0.78);
+  backdrop-filter: blur(6px);
+}
+
+.landing-card-about-text {
+  margin: 0;
+  max-width: 34em;
+  font-size: clamp(0.95rem, 1.4vw, 1.2rem);
+  line-height: 1.55;
+  color: var(--text-strong);
+}
+
+.landing-card-title {
+  position: absolute;
+  top: 18px;
+  left: 20px;
+  z-index: 2;
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.75);
+  transition: color 0.3s ease;
+}
+
+.landing-card:hover .landing-card-title,
+.landing-card:focus-visible .landing-card-title {
+  color: var(--accent-text);
+}
+
+/* A strip across the foot of the card that fades in on hover. */
+.landing-card-detail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  padding: 14px 20px;
+  background: rgba(19, 21, 22, 0.92);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.landing-card-detail p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.landing-card:hover .landing-card-detail,
+.landing-card:focus-visible .landing-card-detail {
+  opacity: 1;
+  transition-delay: 0.35s;
+}
+
+/* ---------- Footer ---------- */
+.landing-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.landing-logos {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 10px;
+  background: var(--logo-background);
+  border-radius: 5px;
+  opacity: 0.8;
+  transition: opacity 0.25s ease;
+}
+
+.landing-logos:hover {
+  opacity: 1;
+}
+
+.landing-logos a {
+  display: block;
+  line-height: 0;
+}
+
+.landing-logos img {
+  display: block;
+  height: 40px;
+  width: auto;
+}
+
+/* ---------- Project overlay ---------- */
+.landing-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+.landing-overlay-card {
+  position: relative;
+  box-sizing: border-box;
+  width: 80vw;
+  max-width: 1100px;
+  height: 80vh;
+  height: 80dvh;
+  overflow-y: auto;
+  padding: 56px clamp(24px, 6vw, 88px) 40px;
+  background: var(--panel);
+  color: var(--text);
+  font-family: 'Barlow', sans-serif;
+  border-radius: 10px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  /* The opening animation scales it from its top left corner, out of the card that opened it. */
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.landing-overlay-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  padding: 6px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--button);
+  color: var(--text-strong);
+  cursor: pointer;
+}
+
+.landing-overlay-close:hover,
+.landing-overlay-close:focus-visible {
+  background: var(--active);
+  color: var(--white);
+}
+
+.landing-overlay-header {
+  margin-bottom: 32px;
+}
+
+.landing-overlay-kicker {
+  font-size: 0.85rem;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+
+.landing-overlay-card h2 {
+  margin: 4px 0 12px;
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 500;
+  color: var(--white);
+}
+
+.landing-overlay-lead {
+  max-width: 44em;
+  margin: 0;
+  font-size: 1.2rem;
+  line-height: 1.55;
+  color: var(--text-strong);
+}
+
+.landing-overlay-card section {
+  max-width: 52em;
+  margin-bottom: 28px;
+}
+
+.landing-overlay-card h3 {
+  margin: 0 0 8px;
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--accent-text);
+}
+
+.landing-overlay-card p,
+.landing-overlay-card dd,
+.landing-overlay-card li {
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.landing-overlay-card a {
+  color: var(--link);
+}
+
+.landing-overlay-measures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin: 0;
+}
+
+.landing-overlay-measures div {
+  padding: 14px 16px;
+  background: var(--button);
+  border-radius: 6px;
+}
+
+.landing-overlay-measures dt {
+  margin-bottom: 4px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.landing-overlay-measures dd {
+  margin: 0;
+}
+
+.landing-overlay-partners {
+  margin: 0;
+  padding-left: 1.2em;
+}
+
+.landing-overlay-footer {
+  margin-top: 8px;
+}
+
+.landing-button {
+  display: inline-block;
+  padding: 10px 24px;
+  border-radius: 20px;
+  background: var(--accent);
+  color: var(--backdrop-edge) !important;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: background 0.2s ease;
+}
+
+.landing-button:hover,
+.landing-button:focus-visible {
+  filter: brightness(1.15);
+}
+
+/* While the overlay grows out of the about card, the card itself is hidden: the overlay takes its place. */
+.landing-card-open {
+  visibility: hidden;
+}
+
+/* The copy of the map card that grows to fill the window: only the map, without its title or strip. */
+.landing-expander .landing-card-title,
+.landing-expander .landing-card-detail {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-card {
+    transition: none;
+  }
+}
+
+/* ---------- Narrow screens ---------- */
+@media (max-width: 900px) {
+  .landing-page {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow-y: auto;
+    padding: 32px 16px 16px;
+  }
+
+  .landing-row {
+    grid-template-columns: 1fr;
+    max-width: 520px;
+    margin: 0 auto;
+  }
+
+  .landing-card:hover,
+  .landing-card:focus-visible {
+    transform: none;
+  }
+
+  .landing-card-detail {
+    opacity: 1;
+  }
+
+  /* The about card already carries its text; the strip would cover it. */
+  .landing-card-about .landing-card-detail {
+    display: none;
+  }
+
+  .landing-footer {
+    justify-content: center;
+  }
+
+  .landing-overlay-card {
+    width: 100vw;
+    height: 100dvh;
+    border-radius: 0;
+    padding: 56px 16px 32px;
+  }
+}
