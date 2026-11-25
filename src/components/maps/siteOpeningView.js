@@ -14,8 +14,7 @@ function drawn(panel) {
 
 /**
  * How far the panels reach into the map from its right and bottom edges, in px: the map card
- * at the top right, and at the bottom the highest of the date bar, the logo overlay and the
- * basemap switcher. Read from the drawn panels; a panel that is not drawn reaches zero.
+ * at the top right, and at the bottom the higher of the date bar and the basemap switcher. Read from the drawn panels; a panel that is not drawn reaches zero.
  */
 export function panelReach(map) {
   const container = map.getContainer();
@@ -24,7 +23,6 @@ export function panelReach(map) {
   const card = drawn(container.querySelector('.map-card'));
   const tops = [
     container.closest('.App')?.querySelector('.bottom-bar'),
-    view?.querySelector('.map-logos'),
     view?.querySelector('.map-basemap'),
   ]
     .map(drawn)

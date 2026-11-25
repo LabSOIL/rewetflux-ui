@@ -3,7 +3,8 @@ import { createRoot } from 'react-dom/client';
 import FrontendApp from './App';
 import Landing from './pages/Landing';
 import './index.css';
-import { applyTheme } from './theme';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { FONT, applyTheme } from './theme';
 import { RouterProvider, Routes, Route, createBrowserRouter } from 'react-router-dom';
 
 export const App = () => {
@@ -26,8 +27,13 @@ export const App = () => {
 
 applyTheme();
 
+// The MUI components (chips, sliders, the panels' titles) in the interface's typeface, not their own default.
+const muiTheme = createTheme({ typography: { fontFamily: FONT } });
+
 createRoot(document.getElementById('root')).render(
     <StrictMode>
-        <App />
+        <ThemeProvider theme={muiTheme}>
+            <App />
+        </ThemeProvider>
     </StrictMode>
 )

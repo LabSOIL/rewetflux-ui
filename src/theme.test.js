@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { RAIL_WIDTH, TEXT_PAIRS, applyTheme, cssVariables, theme } from './theme';
+import { FONT, RAIL_WIDTH, TEXT_PAIRS, applyTheme, cssVariables, theme } from './theme';
 
 const channel = value => (value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
 const luminance = hex => {
@@ -51,10 +51,16 @@ describe('theme', () => {
     expect(cssVariables()['--soil-surface']).toBe(theme.soilSurface);
   });
 
-  it('sets the rail width as a custom property', () => {
+  it('sets the rail width and the typeface as custom properties', () => {
     const root = document.createElement('div');
     applyTheme(root);
     expect(root.style.getPropertyValue('--rail-width')).toBe(`${RAIL_WIDTH}px`);
+    expect(root.style.getPropertyValue('--font')).toBe(FONT);
+  });
+
+  it('exposes the shadows and the landing shades as custom properties', () => {
+    expect(cssVariables()['--shadow-panel']).toBe(theme.shadowPanel);
+    expect(cssVariables()['--veil']).toBe(theme.veil);
   });
 });
 
@@ -63,13 +69,22 @@ const walk = dir => readdirSync(dir).flatMap(name => {
   return statSync(path).isDirectory() ? walk(path) : [path];
 });
 
-describe('components', () => {
-  const sources = walk('src/components').filter(
-    path => /\.(jsx?|tsx?|css)$/.test(path) && !/\.test\./.test(path),
+describe('sources', () => {
+  // The model files under src/data are content, not styling.
+  const sources = walk('src').filter(
+    path => /\.(jsx?|tsx?|css)$/.test(path)
+      && !/\.test\./.test(path)
+      && path !== join('src', 'theme.js')
+      && !path.startsWith(join('src', 'data')),
   );
 
   it.each(sources)('%s holds no colour literal', path => {
     const text = readFileSync(path, 'utf8');
     expect(text.match(/#[0-9a-fA-F]{3,8}\b|rgba?\(/g) ?? []).toEqual([]);
+  });
+
+  it.each(sources)('%s names no typeface', path => {
+    const text = readFileSync(path, 'utf8');
+    expect(text.match(/Barlow|Arial|Helvetica|Roboto|system-ui|sans-serif|monospace/g) ?? []).toEqual([]);
   });
 });

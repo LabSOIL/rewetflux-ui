@@ -33,7 +33,6 @@ for (const size of WINDOW_SIZES.slice(0, 2)) {
         const boxes = await boxesOf(page, {
             rail: PANELS.rail,
             bottomBar: PANELS.bottomBar,
-            logos: PANELS.logos,
             basemap: PANELS.basemap,
             card: SITE_3D.card,
             profile: SITE_3D.profile,

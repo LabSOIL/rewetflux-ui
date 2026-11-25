@@ -1,7 +1,6 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
 import MapView from './MapView';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -89,51 +88,14 @@ describe('MapView', () => {
     expect(thumbnail()).toContain('ch.swisstopo.swissimage');
   });
 
+  it('carries no logos', () => {
+    expect(container.querySelector('.map-view img[alt$="Logo"]')).toBeNull();
+  });
+
   it('holds the legend alone in the card at the top right', () => {
     const card = container.querySelector('.map-card');
     expect(container.querySelectorAll('.map-card')).toHaveLength(1);
     expect(card.querySelector('.legend-title').textContent).toBe('Redox [mV]');
     expect(card.querySelector('input, hr')).toBeNull();
-  });
-
-  it('shows the funder logos as links in one overlay beside the map, outside the leaflet container', () => {
-    const overlay = container.querySelector('.map-view > .map-logos');
-    expect(overlay).not.toBeNull();
-    expect(overlay.closest('.leaflet-container')).toBeNull();
-    const links = [...overlay.querySelectorAll('a')];
-    expect(links.map(a => a.querySelector('img').alt)).toEqual([
-      'EPFL Logo',
-      'Enterprise for Society Center Logo',
-      'Pro Natura Logo',
-    ]);
-    links.forEach(a => expect(a.getAttribute('href')).toMatch(/^https:\/\//));
-  });
-});
-
-describe('MapView.css', () => {
-  const css = readFileSync('src/components/maps/MapView.css', 'utf8');
-  const rule = selector =>
-    [...css.matchAll(new RegExp(`(?:^|\\n)${selector.replace(/[.]/g, '\\.')}\\s*\\{([^}]*)\\}`, 'g'))]
-      .map(m => m[1])
-      .join('\n');
-
-  it('places the logo overlay at the bottom right, above the date bar and clear of the zoom control', () => {
-    expect(rule('.map-logos')).toMatch(/right:\s*50px/);
-    expect(rule('.map-logos')).toMatch(/bottom:\s*115px/);
-    expect(rule('.map-logos')).toMatch(/z-index:\s*1000/);
-  });
-
-  it('backs the logos with the theme logo background', () => {
-    expect(rule('.map-logos')).toMatch(/background:\s*var\(--logo-background\)/);
-  });
-
-  it('sizes every logo to a 40px height with the width following its shape', () => {
-    expect(rule('.map-logos img')).toMatch(/height:\s*40px/);
-    expect(rule('.map-logos img')).toMatch(/width:\s*auto/);
-  });
-
-  it('shows the logos semi-transparent until they are hovered', () => {
-    expect(rule('.map-logos')).toMatch(/opacity:\s*0\.55/);
-    expect(rule('.map-logos:hover')).toMatch(/opacity:\s*1\b/);
   });
 });

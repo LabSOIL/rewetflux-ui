@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { theme } from '../../theme';
+import { FONT, theme } from '../../theme';
 import { DEPTHS, hexChannels } from './fields';
 
 const WIDTH = 440;
@@ -65,7 +65,7 @@ function draw(canvas, samples, colour, base) {
   context.stroke();
 
   context.fillStyle = theme.muted;
-  context.font = '11px Barlow, sans-serif';
+  context.font = `11px ${FONT}`;
   context.textAlign = 'right';
   context.textBaseline = 'middle';
   context.fillText(`${Math.round(base + high)} m`, MARGIN.left - 6, y(high));

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import 'leaflet/dist/leaflet.css';
 import SitePreview from './SitePreview';
 import ProjectOverlay from './ProjectOverlay';
-import { FUNDERS } from '../components/maps/MapLogos';
+import { FUNDERS } from './partners';
 import { canAnimate, expandToWindow } from './expand';
 import './Landing.css';
 
@@ -13,30 +13,24 @@ import './Landing.css';
  */
 export const BACKGROUND_VIDEO = './balmoos.mp4';
 
+/** The background footage, playing muted on a loop from the moment the page opens. */
 function BackgroundVideo() {
-  const videoRef = useRef(null);
+  const ref = useRef(null);
   const [failed, setFailed] = useState(false);
 
-  // A visitor who asks for reduced motion sees the first frame, not the loop.
+  // React sets `muted` as a property after the element exists, which some browsers do not count
+  // for autoplay, so the video is muted and started here.
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-    video.pause();
+    const video = ref.current;
+    if (!video) return;
+    video.muted = true;
+    video.play?.()?.catch(() => {});
   }, []);
 
   return (
     <div className="landing-background" aria-hidden="true">
       {!failed && (
-        <video
-          ref={videoRef}
-          src={BACKGROUND_VIDEO}
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="auto"
-          onError={() => setFailed(true)}
-        />
+        <video ref={ref} src={BACKGROUND_VIDEO} muted loop playsInline preload="auto" onError={() => setFailed(true)} />
       )}
       <div className="landing-background-shade" />
     </div>
@@ -110,6 +104,12 @@ export default function Landing() {
         </main>
 
         <footer className="landing-footer">
+          <p className="landing-credit">
+            Imagery &copy;{' '}
+            <a href="https://www.swisstopo.admin.ch/" target="_blank" rel="noopener noreferrer">
+              swisstopo
+            </a>
+          </p>
           <div className="landing-logos">
             {FUNDERS.map(f => (
               <a key={f.alt} href={f.href} target="_blank" rel="noopener noreferrer">

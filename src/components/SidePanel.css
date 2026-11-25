@@ -1,7 +1,3 @@
-.button-group button {
-    font-family: 'Arial', 'Helvetica', sans-serif;
-}
-
 .side-panel {
     width: var(--rail-width);
     padding: 0;
@@ -30,6 +26,7 @@
 
 .button-group button {
     width: 100%;
+    font-family: inherit;
     height: 70px;
     background-color: var(--button);
     color: var(--text);
@@ -160,7 +157,7 @@
     width: 400px;
     background: var(--panel);
     color: var(--text);
-    box-shadow: 2px 2px 10px var(--shadow);
+    box-shadow: var(--shadow-panel);
     padding: 15px;
     z-index: 1100;
     /* Higher than tooltip's z-index */
@@ -286,7 +283,6 @@
 
 .slot-label {
     padding: 10px 0 6px;
-    font-family: 'Arial', 'Helvetica', sans-serif;
     font-size: 12px;
     color: var(--text);
     text-align: center;
@@ -310,7 +306,6 @@
     align-items: center;
     gap: 8px;
     padding: 0 6px 0 17px;
-    font-family: 'Arial', 'Helvetica', sans-serif;
     font-size: 12px;
     color: var(--muted);
     white-space: nowrap;
@@ -345,7 +340,7 @@
     background: none;
     border: none;
     color: var(--text);
-    font-family: 'Arial', 'Helvetica', sans-serif;
+    font-family: inherit;
     font-size: 12px;
     cursor: pointer;
 }

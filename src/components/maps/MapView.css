@@ -19,7 +19,7 @@
 }
 
 /* The view controls, the same over the map and the 3D scene: zoom at the bottom right, as tall as
-   the date bar beside it (30px to 101px up), and Reset view above, level with the logos and the
+   the date bar beside it (30px to 101px up), and Reset view above, level with the
    basemap switcher (115px up) */
 .view-controls {
     position: absolute;
@@ -35,7 +35,7 @@
 .view-controls-zoom {
     border-radius: 4px;
     overflow: hidden;
-    box-shadow: 2px 2px 10px var(--shadow);
+    box-shadow: var(--shadow-panel);
 }
 
 .view-controls-zoom {
@@ -52,7 +52,8 @@
     border: none;
     background: var(--panel);
     color: var(--text);
-    font: 18px 'Barlow', sans-serif;
+    font-size: 18px;
+    font-family: inherit;
     cursor: pointer;
 }
 
@@ -91,7 +92,7 @@
     background: var(--panel);
     color: var(--text);
     border-radius: 5px;
-    box-shadow: 2px 2px 10px var(--shadow);
+    box-shadow: var(--shadow-panel);
     padding: 10px;
 }
 
@@ -159,40 +160,7 @@
     font-size: 11px;
 }
 
-/* The funders' logos: above the date bar (its top is 101px up) and clear of the zoom control on the right */
-.map-logos {
-    position: absolute;
-    right: 50px;
-    bottom: 115px;
-    z-index: 1000;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 6px 10px;
-    background: var(--logo-background);
-    border-radius: 5px;
-    box-shadow: 2px 2px 10px var(--shadow);
-    opacity: 0.55;
-    transition: opacity 0.25s ease;
-}
-
-.map-logos:hover {
-    opacity: 1;
-}
-
-.map-logos a {
-    display: block;
-    line-height: 0;
-}
-
-/* Every logo at one height; the width follows each logo's own shape, so an SVG with only a viewBox gets a size */
-.map-logos img {
-    height: 40px;
-    width: auto;
-    display: block;
-}
-
-/* The basemap switcher: at the bottom left, as high above the date bar as the logos on the right,
+/* The basemap switcher: at the bottom left, 115px up, clear of the date bar,
    over the 3D scene as well as the map; a thumbnail of the layer it switches to, named across its foot */
 .map-basemap {
     position: absolute;
@@ -206,8 +174,9 @@
     overflow: hidden;
     border: 2px solid var(--white);
     border-radius: 6px;
+    font-family: inherit;
     background: var(--button);
-    box-shadow: 2px 2px 10px var(--shadow);
+    box-shadow: var(--shadow-panel);
     cursor: pointer;
 }
 
@@ -233,7 +202,8 @@
     padding: 12px 0 3px;
     background: linear-gradient(to bottom, transparent, var(--scrim));
     color: var(--white);
-    font: 600 12px 'Barlow', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
     text-align: center;
 }
 

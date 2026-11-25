@@ -6,7 +6,6 @@ export const PANELS = {
     zoom: '.view-controls',
     layers: '.leaflet-control-layers',
     card: '.map-card',
-    logos: '.map-logos',
     basemap: '.map-basemap',
     legend: '.legend-container',
     bottomBar: '.bottom-bar',
@@ -21,7 +20,7 @@ export const MARKERS = 'path.leaflet-interactive, .leaflet-marker-icon';
 export const RAIL_BUTTONS = '.side-panel button';
 export const RAIL_POPUPS = ['Variable', 'Info'];
 export const DEPTH_GAUGE = '.depth-gauge';
-export const LOGO_IMAGES = '.map-logos img';
+export const LOGO_IMAGES = '.landing-logos img';
 export const MAP_CONTAINER = '.leaflet-container';
 export const SITE_3D = {
     root: '.site3d',

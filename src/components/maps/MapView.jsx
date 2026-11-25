@@ -3,7 +3,6 @@ import { MapContainer, Pane, ScaleControl, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { CatchmentLayers } from './Catchment';
 import { BaseLayers, BaseSwitcher, DEFAULT_BASEMAP_ID } from './Layers';
-import MapLogos from './MapLogos';
 import TowerMarker from './TowerMarker';
 import ViewControls from './ViewControls';
 import { MAX_ZOOM } from './basemap';
@@ -120,7 +119,6 @@ export default function MapView({
           <Site3D />
         </Suspense>
       )}
-      <MapLogos />
       <BaseSwitcher baseId={baseId} onBase={setBaseId} />
       <ViewControls map={map} onReset={() => setShouldRecenter(true)} />
     </div>

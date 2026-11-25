@@ -104,13 +104,12 @@ describe('App', () => {
     expect(bar.style.right).toBe('50px');
   });
 
-  it('opens the info panel from the side panel, which holds no logos; the map carries them', async () => {
+  it('opens the info panel from the side panel, which holds no logos', async () => {
     expect(container.querySelector('.popup')).toBeNull();
     await act(async () => railButton('Info').click());
     const info = container.querySelector('.popup');
     expect(info).not.toBeNull();
     expect(info.querySelectorAll('img')).toHaveLength(0);
-    expect([...container.querySelectorAll('.map-logos img')].map(i => i.alt)).toHaveLength(3);
     await act(async () => railButton('Info').click());
     expect(container.querySelector('.popup')).toBeNull();
   });

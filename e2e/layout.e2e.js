@@ -55,8 +55,9 @@ test('the depth gauge sits inside the rail', async ({ browser }) => {
     await page.close();
 });
 
-test('every partner logo has a box', async ({ browser }) => {
-    const page = await openSite(browser, WINDOW_SIZES[0]);
+test('every partner logo on the landing page has a box', async ({ browser }) => {
+    const page = await browser.newPage({ viewport: WINDOW_SIZES[0] });
+    await page.goto('/');
     const logos = page.locator(LOGO_IMAGES);
     expect(await logos.count()).toBe(3);
     for (const logo of await logos.all()) {

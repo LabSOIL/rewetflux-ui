@@ -8,11 +8,12 @@ import { getArea, getLatestAt } from './data';
 import { SelectionProvider, useSelection } from './contexts/SelectionContext';
 import { ViewProvider } from './contexts/ViewContext';
 import { siteView } from './utils/siteView';
+import { theme } from './theme';
 
 // The map layer a selectable variable draws; the fluxes have no marker layer yet.
 const LAYER_FOR_VARIABLE = { redox: 'Redox', temperature: 'Temperature', moisture: 'Moisture' };
 
-const DEFAULT_COLOUR = '#000000';
+const DEFAULT_COLOUR = theme.noData;
 const SITE = siteView(getArea().geom);
 
 export default function App() {

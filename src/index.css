@@ -1,13 +1,17 @@
-body {
+/* The base of every page: the one typeface from the theme (`--font`), on the page colour. */
+html,
+body,
+#root {
+  height: 100%;
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: var(--font);
+  background: var(--page);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+/* Leaflet sets its own typeface on the map and its controls. */
+.leaflet-container,
+.leaflet-container * {
+  font-family: var(--font);
 }

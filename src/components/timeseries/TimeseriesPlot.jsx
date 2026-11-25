@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useMemo } from 'react';
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
-import { theme } from '../../theme';
+import { FONT, theme } from '../../theme';
 
 const COLORS = theme.chart.series;
 
@@ -57,7 +57,7 @@ const TOOLTIP_STYLE = {
   padding: '8px 12px',
   borderRadius: '4px',
   fontSize: '12px',
-  fontFamily: 'system-ui, sans-serif',
+  fontFamily: FONT,
   pointerEvents: 'none',
   zIndex: '100',
   lineHeight: '1.5',
