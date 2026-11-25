@@ -60,6 +60,8 @@ const TILT_EASE = 0.35;
 const KEY_TURN = (5 * Math.PI) / 180;
 // Unselected slices are drawn at this share of their colour.
 const DIMMED = 0.5;
+// The share of its colour the basemap around the layers keeps at full tilt, so it does not compete with them.
+const BASEMAP_SHARE = 0.1;
 // Peeled layers, those above the picked depth, fade to this opacity, a step a frame.
 const PEELED = 0.1;
 const PEEL_STEP = 0.12;
@@ -186,7 +188,7 @@ function makeLabel(text, onClick) {
  * through the set* methods.
  */
 export class SiteScene {
-  constructor(container, { terrain, ring, grid, coverage, positions, surroundings, spacing, flat, autoTilt, onHover, onPick, onCompass, onCutSamples, onCut }) {
+  constructor(container, { terrain, ring, grid, coverage, positions, surroundings, spacing, flat, onHover, onPick, onCompass, onCutSamples, onCut }) {
     this.container = container;
     this.terrain = terrain;
     this.ring = ring;
@@ -200,12 +202,10 @@ export class SiteScene {
     this.chosenSpacing = spacing;
     this.spacing = 0;
     this.shade = 1;
-    this.basemapShare = 1;
     this.dragging = false;
     this.steering = false;
     this.compass = null;
     this.flat = flat;
-    this.autoTilt = autoTilt;
     this.manual = false;
     this.autoPolar = null;
     this.flight = null;
@@ -329,11 +329,6 @@ export class SiteScene {
     const [e, n] = this.terrain.frame.toLocal(...terrain.frame.toLonLat(0, 0));
     this.around.position.set(e, terrain.base - this.terrain.base - 1, -n);
     this.context.add(this.around);
-  }
-
-  /** Shows or hides the ground over the polygon and the positions on it, uncovering the slices. */
-  setGroundShown(shown) {
-    for (const part of [...this.groundParts, ...this.dots]) part.visible = shown;
   }
 
   buildSlices() {
@@ -501,11 +496,6 @@ export class SiteScene {
     this.applySelection();
   }
 
-  /** Whether the layers above the picked depth, the ground among them, peel away to show it whole. */
-  setPeel(on) {
-    this.peel = on;
-  }
-
   // The ground and each slice, with its depth (the ground's is 0) and the materials that fade when it peels.
   peelLayers() {
     return [
@@ -514,10 +504,11 @@ export class SiteScene {
     ];
   }
 
-  // Each frame the peeled layers fade a step towards faint, the others back to solid.
+  // Each frame the layers above the picked depth, the ground among them, fade a step towards
+  // faint so it shows whole; the others come back to solid.
   stepPeel() {
     for (const { depth, materials } of this.peelLayers()) {
-      const target = this.peel && this.depth != null && depth < this.depth ? PEELED : 1;
+      const target = this.depth != null && depth < this.depth ? PEELED : 1;
       for (const material of materials) {
         const now = material.userData.peel ?? 1;
         if (now === target) continue;
@@ -576,11 +567,6 @@ export class SiteScene {
     for (const mesh of [this.blockAround, this.around]) {
       if (mesh.material.map) mesh.material.color.setScalar(shade);
     }
-  }
-
-  /** The share of its colour the basemap around the layers keeps at full tilt, 0 to 1; flat, it is whole. */
-  setBasemapShare(share) {
-    this.basemapShare = share;
   }
 
   /** The slices' spacing at full tilt, in metres per 10 cm of depth. */
@@ -1057,12 +1043,6 @@ export class SiteScene {
     this.controls.update();
   }
 
-  /** Whether the view tilts as it zooms; off, only drags and keys tilt it. */
-  setAutoTilt(on) {
-    this.autoTilt = on;
-    this.manual = false;
-  }
-
   /** The tilt that goes with a distance when tilting as you zoom: flat at the flat distance, full a span closer. */
   tiltFor(radius) {
     return TILTED * smooth(clamp01((this.flat - radius) / (this.flat * (1 - TILT_SPAN))));
@@ -1081,7 +1061,7 @@ export class SiteScene {
     const k = smooth(clamp01(polar / TILTED));
     const spacing = this.chosenSpacing * k;
     if (Math.abs(spacing - this.spacing) > 0.01) this.setSpacing(spacing);
-    const shade = lerp(1, this.basemapShare, k);
+    const shade = lerp(1, BASEMAP_SHARE, k);
     if (Math.abs(shade - this.shade) > 0.002) this.setShade(shade);
     if (!this.compass || Math.abs(this.compass[0] - azimuth) > 0.003 || Math.abs(this.compass[1] - polar) > 0.003) {
       this.compass = [azimuth, polar];
@@ -1089,10 +1069,10 @@ export class SiteScene {
     }
   }
 
-  // While tilting as you zoom, the tilt eases towards the one for the distance, until the user
-  // tilts by hand; zooming back out past the flat distance lets it follow the zoom again.
+  // The tilt eases towards the one for the distance as the view zooms, until the user tilts by
+  // hand; zooming back out past the flat distance lets it follow the zoom again.
   tiltWithZoom() {
-    if (!this.autoTilt || !this.steering || this.flight) return;
+    if (!this.steering || this.flight) return;
     const view = this.currentView();
     if (this.dragging) {
       if (this.autoPolar != null && Math.abs(view.polar - this.autoPolar) > 0.03) this.manual = true;

@@ -80,6 +80,17 @@ test('the cross-section is off as the 3D view opens and the rail turns it on, wi
     await page.close();
 });
 
+test('the 3D card holds the basemap, the layer spacing and the legend, with nothing to switch', async ({ browser }) => {
+    const page = await openSite(browser, WINDOW_SIZES[0]);
+    await open3D(page);
+    const card = page.locator(SITE_3D.card);
+    await expect(card.locator('input[type="checkbox"]')).toHaveCount(0);
+    await expect(card.getByRole('slider')).toHaveCount(1);
+    await expect(card.getByRole('slider', { name: 'Layer spacing' })).toHaveCount(1);
+    await expect(card.getByRole('radio')).toHaveCount(2);
+    await page.close();
+});
+
 test('the cross-section moves by either of its move handles, which stay put under the pointer', async ({ browser }) => {
     const page = await openSite(browser, WINDOW_SIZES[0]);
     await openCut(page);

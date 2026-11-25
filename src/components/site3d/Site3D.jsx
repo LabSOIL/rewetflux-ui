@@ -36,8 +36,6 @@ const BASEMAP_ZOOM = 19;
 const SURROUNDINGS_ZOOM = 16;
 // Metres of drop per 10 cm of depth when the scene opens.
 const DEFAULT_SPACING = 30;
-// The share in % of its colour the basemap keeps behind the layers, so it does not compete with them.
-const DEFAULT_BASEMAP_STRENGTH = 10;
 // The generated variation as a share of the readings' range.
 const NOISE_SHARE = 0.3;
 const NOISE_SEED = 7;
@@ -229,9 +227,6 @@ export default function Site3D() {
   const start = useRef(mapView(model, view.from));
   const [phase, setPhase] = useState('loading');
   const [spacing, setSpacing] = useState(DEFAULT_SPACING);
-  const [basemapStrength, setBasemapStrength] = useState(DEFAULT_BASEMAP_STRENGTH);
-  const [groundOn, setGroundOn] = useState(true);
-  const [peel, setPeel] = useState(false);
   // The cross-section's handles set its direction in degrees and its offset from the polygon's
   // centre as a share of its reach; the rail turns it on and off.
   const [cut, setCut] = useState({ angle: OPENING_CUT_ANGLE, offset: 0 });
@@ -297,7 +292,6 @@ export default function Site3D() {
       ...model,
       spacing: DEFAULT_SPACING,
       flat,
-      autoTilt: view.autoTilt,
       onHover: hover.set,
       onPick: selectOption,
       onCompass,
@@ -345,17 +339,6 @@ export default function Site3D() {
     scene.current.setSelectedDepth(variable === 'redox' ? option : null);
   }, [variable, option]);
 
-  // Picking a depth, on the rail or on a slice, peels the layers above it away.
-  const shownDepth = useRef(option);
-  useEffect(() => {
-    if (option !== shownDepth.current) setPeel(true);
-    shownDepth.current = option;
-  }, [option]);
-
-  useEffect(() => {
-    scene.current.setPeel(peel);
-  }, [peel]);
-
   useEffect(() => {
     scene.current.setCut(cutOn ? { cutAt, angle: cut.angle, offset: cut.offset } : null);
   }, [cutOn, cutAt, cut]);
@@ -363,18 +346,6 @@ export default function Site3D() {
   useEffect(() => {
     scene.current.chooseSpacing(spacing);
   }, [spacing]);
-
-  useEffect(() => {
-    scene.current.setGroundShown(groundOn);
-  }, [groundOn]);
-
-  useEffect(() => {
-    scene.current.setBasemapShare(basemapStrength / 100);
-  }, [basemapStrength]);
-
-  useEffect(() => {
-    scene.current.setAutoTilt(view.autoTilt);
-  }, [view.autoTilt]);
 
   useEffect(() => {
     if (phase === 'showing') {
@@ -406,7 +377,6 @@ export default function Site3D() {
     if (view.mode !== 'leaving' || phase === 'returning' || phase === 'fading') return;
     setPhase('returning');
     hover.set(null);
-    setGroundOn(true);
     const site = scene.current;
     site.setSteering(false);
     // The map takes over where the scene looks, once it is flat and north up.
@@ -444,21 +414,6 @@ export default function Site3D() {
           <hr className="map-card-separator" />
           <div className="site3d-control">
             <div className="site3d-control-label">
-              <span>Basemap strength</span>
-              <span className="site3d-control-value">{basemapStrength}%</span>
-            </div>
-            <Slider
-              size="small"
-              min={0}
-              max={100}
-              value={basemapStrength}
-              onChange={(_, value) => setBasemapStrength(value)}
-              aria-label="Basemap strength"
-              sx={sliderSx}
-            />
-          </div>
-          <div className="site3d-control">
-            <div className="site3d-control-label">
               <span>Layer spacing</span>
               <span className="site3d-control-value">×{spacing * 10}</span>
             </div>
@@ -473,18 +428,6 @@ export default function Site3D() {
               sx={sliderSx}
             />
           </div>
-          <label className="site3d-check">
-            <input type="checkbox" checked={view.autoTilt} onChange={event => view.setAutoTilt(event.target.checked)} />
-            <span>Tilt as you zoom</span>
-          </label>
-          <label className="site3d-check">
-            <input type="checkbox" checked={groundOn} onChange={event => setGroundOn(event.target.checked)} />
-            <span>Ground</span>
-          </label>
-          <label className="site3d-check">
-            <input type="checkbox" checked={peel} onChange={event => setPeel(event.target.checked)} />
-            <span>Peel layers above the depth</span>
-          </label>
           <hr className="map-card-separator" />
           <Legend {...legend} />
           <p className="site3d-note">

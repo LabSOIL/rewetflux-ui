@@ -10,8 +10,8 @@ ground from swissALTI3D, draped with the chosen basemap, about 2.6 km of surroun
 redox layers at 5, 15, 25 and 35 cm, the 5 cm one on the ground and each deeper one a step below.
 Unticking it returns to the map at the same place (`?view=3d` opens straight in 3D). The controls
 follow other 3D maps: scroll zooms, drag moves, right-drag or Shift-drag turns and tilts, Shift
-with the arrows tilts and turns. Tilting as you zoom (on by default) tilts the view and drops the
-deeper layers as you zoom in. Picking a depth peels the layers above it away. The rail's
+with the arrows tilts and turns. Zooming in tilts the view and drops the deeper layers, until
+you tilt by hand. Picking a depth peels the layers above it away. The rail's
 Cross-section button, under 3D layers, cuts the landscape and the layers along a line: its two
 move handles slide the cut nearer or further, and the turn handles at its ends turn it (Shift
 snaps to 15°). The layers are generated from the

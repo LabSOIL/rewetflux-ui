@@ -148,10 +148,6 @@
     color: var(--accent-text);
 }
 
-.map-card label.site3d-check {
-    margin-top: 2px;
-}
-
 .site3d-note {
     margin: 8px 0 0;
     color: var(--muted);

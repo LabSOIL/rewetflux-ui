@@ -36,8 +36,8 @@ export const mapViewOf = map => {
  * `mode` is '2d', '3d' while the scene is open, or 'leaving' while it goes back to the map;
  * `shown` is true while the scene covers the map; `from` is the map's view when 3D opened;
  * `returnTo` is where the scene looked as it handed back, `{ lon, lat, metresPerPixel }`;
- * `autoTilt` is whether the 3D view tilts as it zooms in; `crossSection` is whether it cuts
- * through the ground and the slices, off each time the scene opens.
+ * `crossSection` is whether the 3D view cuts through the ground and the slices, off each time
+ * the scene opens.
  */
 export function ViewProvider({ children, start3D = opensIn3D }) {
   const [initially3D] = useState(start3D);
@@ -46,7 +46,6 @@ export function ViewProvider({ children, start3D = opensIn3D }) {
   const [shown, setShown] = useState(initially3D);
   const [baseId, setBaseId] = useState(DEFAULT_BASEMAP_ID);
   const [returnTo, setReturnTo] = useState(null);
-  const [autoTilt, setAutoTilt] = useState(true);
   const [crossSection, setCrossSection] = useState(false);
 
   const open3D = useCallback(view => {
@@ -76,12 +75,10 @@ export function ViewProvider({ children, start3D = opensIn3D }) {
       shown,
       baseId,
       returnTo,
-      autoTilt,
       crossSection,
       setBaseId,
       setShown,
       setReturnTo,
-      setAutoTilt,
       setCrossSection,
       open3D,
       leave3D,
@@ -95,7 +92,6 @@ export function ViewProvider({ children, start3D = opensIn3D }) {
       shown,
       baseId,
       returnTo,
-      autoTilt,
       crossSection,
       open3D,
       leave3D,
