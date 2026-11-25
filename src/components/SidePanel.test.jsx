@@ -1,9 +1,10 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import SidePanel from './SidePanel';
 import { SelectionProvider, useSelection } from '../contexts/SelectionContext';
 import { ViewProvider, useView } from '../contexts/ViewContext';
+import { CLOSE_MS, OPEN_MS } from '../utils/hoverPopup';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -163,5 +164,146 @@ describe('SidePanel cross-section', () => {
     });
     expect(container.querySelector('[data-testid="spacing"]').textContent).toBe('12');
     expect(section.textContent).toContain('×120');
+  });
+});
+
+describe('SidePanel variable popup', () => {
+  let container;
+  let root;
+
+  const VariableProbe = () => <output data-testid="variable">{String(useSelection().variable)}</output>;
+  const trigger = () => [...container.querySelectorAll('button')].find(b => b.textContent.includes('Variable'));
+  const popup = () => container.querySelector('.popup[aria-label="Variable"]');
+  const info = () => container.querySelector('.info-popup');
+  const pointer = (el, type, { kind = 'mouse', x = 0, y = 0 } = {}) =>
+    act(() => {
+      el.dispatchEvent(new PointerEvent(type, { bubbles: true, pointerType: kind, clientX: x, clientY: y }));
+    });
+  const over = (el, opts) => pointer(el, 'pointerover', opts);
+  // React reads pointerleave from pointerout, with the element entered as relatedTarget.
+  const out = (el, opts = {}) =>
+    act(() => {
+      const to = opts.to ?? document.body;
+      el.dispatchEvent(new PointerEvent('pointerout', {
+        bubbles: true, pointerType: opts.kind ?? 'mouse', clientX: opts.x ?? 0, clientY: opts.y ?? 0, relatedTarget: to,
+      }));
+    });
+  const wait = ms => act(() => vi.advanceTimersByTime(ms));
+  const click = el => act(() => el.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <SelectionProvider sensors={[]} initial={{ variable: 'redox', option: 5 }}>
+          <SidePanel />
+          <VariableProbe />
+        </SelectionProvider>,
+      );
+    });
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+    container.remove();
+    vi.useRealTimers();
+  });
+
+  it('opens when the mouse rests on the button, not when it only passes over', async () => {
+    await over(trigger());
+    await wait(OPEN_MS - 20);
+    await out(trigger());
+    await wait(OPEN_MS);
+    expect(popup()).toBeNull();
+
+    await over(trigger());
+    await wait(OPEN_MS);
+    expect(popup()).not.toBeNull();
+    expect(trigger().getAttribute('aria-expanded')).toBe('true');
+    expect(trigger().classList.contains('active')).toBe(true);
+  });
+
+  it('stays open while the mouse strays off it for less than the grace period, and closes after', async () => {
+    await over(trigger());
+    await wait(OPEN_MS);
+    await out(trigger(), { x: 20, y: 300 });
+    await wait(CLOSE_MS - 50);
+    await over(popup());
+    await wait(CLOSE_MS * 2);
+    expect(popup()).not.toBeNull();
+
+    await out(popup());
+    await wait(CLOSE_MS);
+    expect(popup()).toBeNull();
+  });
+
+  it('keeps waiting while the mouse moves through the safe area towards the popup', async () => {
+    await over(trigger());
+    await wait(OPEN_MS);
+    popup().getBoundingClientRect = () => ({ left: 100, right: 500, top: 10, bottom: 300 });
+    await out(trigger(), { x: 40, y: 60 });
+    for (let step = 1; step <= 4; step += 1) {
+      await wait(CLOSE_MS - 50);
+      await pointer(document, 'pointermove', { x: 40 + step * 12, y: 60 + step * 30 });
+    }
+    expect(popup()).not.toBeNull();
+    await pointer(document, 'pointermove', { x: 10, y: 500 });
+    await wait(CLOSE_MS);
+    expect(popup()).toBeNull();
+  });
+
+  it('pins open on a click, even once hovered open, until clicked again', async () => {
+    await over(trigger());
+    await wait(OPEN_MS);
+    await click(trigger());
+    await out(trigger());
+    await wait(CLOSE_MS * 2);
+    expect(popup()).not.toBeNull();
+    await click(trigger());
+    expect(popup()).toBeNull();
+  });
+
+  it('opens on a tap and ignores touch as hover, closing on a press outside or Escape', async () => {
+    await over(trigger(), { kind: 'touch' });
+    await wait(OPEN_MS);
+    expect(popup()).toBeNull();
+    await click(trigger());
+    expect(popup()).not.toBeNull();
+    await out(trigger(), { kind: 'touch' });
+    await wait(CLOSE_MS);
+    expect(popup()).not.toBeNull();
+    await pointer(popup(), 'pointerdown', { kind: 'touch' });
+    expect(popup()).not.toBeNull();
+    await pointer(document.body, 'pointerdown', { kind: 'touch' });
+    expect(popup()).toBeNull();
+
+    await click(trigger());
+    await act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+    expect(popup()).toBeNull();
+  });
+
+  it('selects a variable from the hovered popup and closes it', async () => {
+    await over(trigger());
+    await wait(OPEN_MS);
+    const chip = [...popup().querySelectorAll('.MuiChip-root')].find(c => c.textContent !== 'Redox');
+    await click(chip);
+    expect(container.querySelector('[data-testid="variable"]').textContent).not.toBe('redox');
+    expect(popup()).toBeNull();
+  });
+
+  it('shows one popup at a time with Info', async () => {
+    const infoButton = [...container.querySelectorAll('button')].find(b => b.textContent.includes('Info'));
+    await click(infoButton);
+    expect(info()).not.toBeNull();
+    await over(trigger());
+    await wait(OPEN_MS);
+    expect(info()).toBeNull();
+    expect(popup()).not.toBeNull();
+    await click(infoButton);
+    expect(popup()).toBeNull();
+    expect(info()).not.toBeNull();
   });
 });

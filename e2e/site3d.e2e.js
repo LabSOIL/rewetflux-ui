@@ -156,8 +156,8 @@ test('Reset view turns the 3D view back north up at its opening tilt, from the c
     await page.locator(SITE_3D.canvas).focus();
     for (let k = 0; k < 12; k++) await page.keyboard.press('Shift+ArrowLeft');
     for (let k = 0; k < 4; k++) await page.keyboard.press('Shift+ArrowUp');
-    const turned = await needleOf(page);
-    expect(Math.abs(turned.turn - opening.turn)).toBeGreaterThan(0.5);
+    // The needle follows the camera on the scene's next frame.
+    await expect.poll(async () => Math.abs((await needleOf(page)).turn - opening.turn)).toBeGreaterThan(0.5);
 
     await page.locator(PANELS.zoom).getByRole('button', { name: 'Reset view' }).click();
     await expect.poll(async () => Math.abs((await needleOf(page)).turn), { timeout: 3000 }).toBeLessThan(0.01);

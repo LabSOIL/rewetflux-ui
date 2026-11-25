@@ -43,7 +43,8 @@ python3 scripts/tower.py path/to/Tower.stp
 `yarn test` runs the unit tests in jsdom, which has no layout. The checks that need one run in
 Firefox through Playwright (`e2e/`): panels do not overlap at 1430x830 and 1024x700 with each
 rail popup open, visible text meets WCAG AA against its composed background, no position marker
-opens under a panel at 1430x830, 1024x700 and 800x600, the depth gauge sits inside the rail,
+opens under a panel at 1430x830, 1024x700 and 800x600, the Variable popup opens on hover and
+stays open across the gap to it and a brief stray of the pointer, the depth gauge sits inside the rail,
 each partner logo has a box, and the 3D view covers the map, keeps its panels apart with the
 cross-section on, opens and closes with the redox layers toggle, turns its cross-section on from
 the rail and moves and turns it by its handles, and the site opens on the aerial 2D map. Map tiles are answered with a flat `#e8e8e8` tile, so the tests need

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { DEPTH_GAUGE, LOGO_IMAGES, PANELS, RAIL_POPUPS, WINDOW_SIZES } from './selectors.js';
+import { DEPTH_GAUGE, LOGO_IMAGES, PANELS, RAIL_BUTTONS, RAIL_POPUPS, WINDOW_SIZES } from './selectors.js';
 import { openSite, overlaps, panelBoxes, withPopup } from './support.js';
 
 for (const size of WINDOW_SIZES.slice(0, 2)) {
@@ -16,6 +16,30 @@ for (const size of WINDOW_SIZES.slice(0, 2)) {
         await page.close();
     });
 }
+
+test('the Variable popup opens on hover and stays open across the gap and a stray of the pointer', async ({ browser }) => {
+    const page = await openSite(browser, WINDOW_SIZES[0]);
+    const popup = page.locator(PANELS.popup);
+    const button = await page.locator(RAIL_BUTTONS, { hasText: 'Variable' }).first().boundingBox();
+    const rail = await page.locator(PANELS.rail).boundingBox();
+    await page.mouse.move(button.x + button.width / 2, button.y + button.height / 2);
+    await popup.waitFor();
+
+    const gap = { x: rail.x + rail.width + 5, y: button.y + button.height / 2 };
+    const covering = await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('.popup') != null, gap);
+    expect(covering, 'the gap between rail and popup belongs to the popup').toBe(true);
+
+    const box = await popup.boundingBox();
+    await page.mouse.move(box.x + box.width + 40, box.y + box.height + 40);
+    await page.waitForTimeout(150);
+    await page.mouse.move(box.x + 20, box.y + box.height - 20, { steps: 5 });
+    await page.waitForTimeout(600);
+    await expect(popup).toBeVisible();
+
+    await page.mouse.move(box.x + box.width + 200, box.y + box.height + 200);
+    await expect(popup).toHaveCount(0);
+    await page.close();
+});
 
 test('the depth gauge sits inside the rail', async ({ browser }) => {
     const page = await openSite(browser, WINDOW_SIZES[0]);

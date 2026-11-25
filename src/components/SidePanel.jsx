@@ -13,6 +13,7 @@ import { useView } from '../contexts/ViewContext';
 import { theme } from '../theme';
 import { VARIABLES, optionLabel } from '../utils/selection';
 import { hasDateBar } from '../utils/stops';
+import { useHoverPopup } from '../utils/hoverPopup';
 
 const spacingSx = {
   color: theme.accent,
@@ -28,7 +29,12 @@ export default function SidePanel() {
 
   const variableLabel = VARIABLES.find(v => v.key === variable)?.label ?? '';
 
-  const handlePanelClick = panel => setActivePanel(activePanel === panel ? null : panel);
+  // The variables open on hover as well as on a click; one popup shows at a time.
+  const variables = useHoverPopup({ onOpen: () => setActivePanel(null) });
+  const handlePanelClick = panel => {
+    variables.close();
+    setActivePanel(activePanel === panel ? null : panel);
+  };
   const close = () => setActivePanel(null);
 
   return (
@@ -40,7 +46,7 @@ export default function SidePanel() {
         </div>
       )}
       <div className="button-group top">
-        <button onClick={() => handlePanelClick('variables')} className={activePanel === 'variables' ? 'active' : ''}>
+        <button {...variables.triggerProps} className={variables.open ? 'active' : ''}>
           <div className="button-content">
             <LayersOutlinedIcon />
             <span>Variable</span>
@@ -101,13 +107,14 @@ export default function SidePanel() {
         </button>
       </div>
 
-      {activePanel === 'variables' && (
+      {variables.open && (
         <ChoicePanel
           title="Variable"
           choices={VARIABLES.map(v => ({ value: v.key, label: v.label }))}
           selected={variable}
           onSelect={selectVariable}
-          onClose={close}
+          onClose={variables.close}
+          popupProps={variables.popupProps}
         />
       )}
       {activePanel === 'info' && <InfoPanel onClose={close} hasTimeline={hasDateBar(stops)} />}
