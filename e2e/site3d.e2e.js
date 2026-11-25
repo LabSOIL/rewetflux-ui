@@ -6,7 +6,7 @@ const layersButton = page => page.locator(PANELS.rail).getByRole('button', { nam
 
 const open3D = async page => {
     await layersButton(page).click();
-    await page.locator(SITE_3D.hint).waitFor();
+    await page.locator(SITE_3D.open).waitFor();
 };
 
 const crossSectionButton = page => page.locator(PANELS.rail).getByRole('button', { name: /Cross-section/ });
@@ -34,8 +34,8 @@ for (const size of WINDOW_SIZES.slice(0, 2)) {
             rail: PANELS.rail,
             bottomBar: PANELS.bottomBar,
             logos: PANELS.logos,
+            basemap: PANELS.basemap,
             card: SITE_3D.card,
-            hint: SITE_3D.hint,
             profile: SITE_3D.profile,
             nav: SITE_3D.nav,
         });
@@ -80,14 +80,15 @@ test('the cross-section is off as the 3D view opens and the rail turns it on, wi
     await page.close();
 });
 
-test('the 3D card holds the basemap, the layer spacing and the legend, with nothing to switch', async ({ browser }) => {
+test('the 3D card holds the legend alone, and the rail holds the layer spacing as a vertical slider', async ({ browser }) => {
     const page = await openSite(browser, WINDOW_SIZES[0]);
     await open3D(page);
     const card = page.locator(SITE_3D.card);
-    await expect(card.locator('input[type="checkbox"]')).toHaveCount(0);
-    await expect(card.getByRole('slider')).toHaveCount(1);
-    await expect(card.getByRole('slider', { name: 'Layer spacing' })).toHaveCount(1);
-    await expect(card.getByRole('radio')).toHaveCount(2);
+    await expect(card.locator('input')).toHaveCount(0);
+    await expect(card.locator(PANELS.legend)).toHaveCount(1);
+    const spacing = page.locator(PANELS.rail).getByRole('slider', { name: 'Layer spacing' });
+    await expect(spacing).toHaveAttribute('aria-orientation', 'vertical');
+    await expect(page.locator(PANELS.basemap)).toBeVisible();
     await page.close();
 });
 
@@ -154,7 +155,7 @@ test('the 3D layers draw over the map, and turning them off hands back to the ma
 test('the site opens on the 2D map, on the aerial basemap', async ({ browser }) => {
     const page = await openSite(browser, WINDOW_SIZES[0]);
     await expect(page.locator(SITE_3D.root)).toHaveCount(0);
-    await expect(page.locator(PANELS.card).getByLabel('Aerial')).toBeChecked();
+    await expect(page.locator(PANELS.basemap)).toHaveText('Topo');
     await expect(page.locator(PANELS.card).getByText(/3D/)).toHaveCount(0);
     await page.close();
 });
@@ -163,7 +164,7 @@ test('the rail\'s 3D layers button opens the 3D view and closes it again', async
     const page = await openSite(browser, WINDOW_SIZES[0]);
     const button = page.locator(PANELS.rail).getByRole('button', { name: /3D layers/ });
     await button.click();
-    await page.locator(SITE_3D.hint).waitFor();
+    await page.locator(SITE_3D.open).waitFor();
     await expect(button).toHaveAttribute('aria-pressed', 'true');
     await button.click();
     await page.locator(SITE_3D.root).waitFor({ state: 'detached' });

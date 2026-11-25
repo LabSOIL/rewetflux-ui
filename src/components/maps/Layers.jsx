@@ -6,8 +6,8 @@ import { BASEMAP_LAYERS, DEFAULT_BASEMAP_ID, thumbnailTiles, tileOptions } from 
 export { DEFAULT_BASEMAP_ID };
 
 // The thumbnails show each layer's own tiles around the middle of the site, at half their size so
-// they stay sharp on high-density screens; the tiles fill the widest a thumbnail is drawn.
-const THUMBNAIL = { zoom: 16, scale: 0.5, width: 120, height: 52 };
+// they stay sharp on high-density screens; the tiles fill the switcher.
+const THUMBNAIL = { zoom: 16, scale: 0.5, width: 72, height: 72 };
 
 function siteCentre() {
   const ring = getArea()?.geom?.coordinates?.[0];
@@ -41,24 +41,22 @@ export const BaseLayers = ({ baseId }) => (
 );
 
 /**
- * The bases as radio buttons grouped under `name`, each drawn as a thumbnail of the layer itself
- * over the site with its name beneath; the radio stays in the page for the keyboard and for
- * screen readers.
+ * The basemap switcher: a thumbnail of the layer it switches to, over the site, with that layer's
+ * name; pressing it shows that layer. With more than two bases it steps through them in turn.
  */
-export const BaseChooser = ({ baseId, onBase, name = 'basemap' }) => (
-    <div className="map-card-base" role="radiogroup" aria-label="Basemap">
-        {BASEMAP_LAYERS.map(layer => (
-            <label key={layer.id} className="map-card-choice">
-                <input
-                    type="radio"
-                    className="map-card-radio"
-                    name={name}
-                    checked={layer.id === baseId}
-                    onChange={() => onBase(layer.id)}
-                />
-                <span className="map-card-thumbnail" style={THUMBNAILS[layer.id]} aria-hidden="true" />
-                <span className="map-card-choice-name">{layer.name}</span>
-            </label>
-        ))}
-    </div>
-);
+export function BaseSwitcher({ baseId, onBase }) {
+    const at = BASEMAP_LAYERS.findIndex(layer => layer.id === baseId);
+    const next = BASEMAP_LAYERS[(at + 1) % BASEMAP_LAYERS.length];
+    return (
+        <button
+            type="button"
+            className="map-basemap"
+            onClick={() => onBase(next.id)}
+            aria-label={`${next.name} basemap`}
+            title={`Show the ${next.name} basemap`}
+        >
+            <span className="map-basemap-thumbnail" style={THUMBNAILS[next.id]} aria-hidden="true" />
+            <span className="map-basemap-name">{next.name}</span>
+        </button>
+    );
+}

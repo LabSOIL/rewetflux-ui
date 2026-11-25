@@ -7,6 +7,7 @@ export const PANELS = {
     layers: '.leaflet-control-layers',
     card: '.map-card',
     logos: '.map-logos',
+    basemap: '.map-basemap',
     legend: '.legend-container',
     bottomBar: '.bottom-bar',
     scale: '.leaflet-control-scale',
@@ -14,7 +15,7 @@ export const PANELS = {
 };
 
 // Panels a position marker must not open under.
-export const MARKER_COVERS = ['rail', 'bottomBar', 'card', 'zoom'];
+export const MARKER_COVERS = ['rail', 'bottomBar', 'card', 'zoom', 'basemap'];
 
 export const MARKERS = 'path.leaflet-interactive, .leaflet-marker-icon';
 export const RAIL_BUTTONS = '.side-panel button';
@@ -26,7 +27,7 @@ export const SITE_3D = {
     root: '.site3d',
     canvas: '.site3d-canvas canvas',
     card: '.site3d-card',
-    hint: '.site3d-hint',
+    open: '.site3d[data-phase="open"]',
     profile: '.site3d-profile',
     nav: '.site3d-nav',
     cutMove: '.site3d-cut-move',

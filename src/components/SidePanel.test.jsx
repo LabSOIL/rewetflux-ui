@@ -92,7 +92,12 @@ describe('SidePanel cross-section', () => {
   let container;
   let root;
 
-  const CrossSection = () => <output data-testid="cross-section">{String(useView().crossSection)}</output>;
+  const CrossSection = () => (
+    <>
+      <output data-testid="cross-section">{String(useView().crossSection)}</output>
+      <output data-testid="spacing">{String(useView().layerSpacing)}</output>
+    </>
+  );
   const render = async start3D => {
     await act(async () => {
       root.render(
@@ -136,5 +141,27 @@ describe('SidePanel cross-section', () => {
     expect(toggle().getAttribute('aria-pressed')).toBe('true');
     expect(toggle().textContent).toContain('On');
     expect(shown()).toBe('true');
+  });
+
+  it('offers the layer spacing as a vertical slider under the cross-section in 3D, and only there', async () => {
+    await render(false);
+    expect(container.querySelector('input[aria-label="Layer spacing"]')).toBeNull();
+
+    act(() => root.unmount());
+    root = createRoot(container);
+    await render(true);
+    const slider = container.querySelector('input[aria-label="Layer spacing"]');
+    const section = slider.closest('.spacing-section');
+    expect(toggle().nextElementSibling).toBe(section);
+    expect(slider.getAttribute('aria-orientation')).toBe('vertical');
+    expect(section.textContent).toContain('×300');
+
+    const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+    await act(async () => {
+      setValue.call(slider, '12');
+      slider.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(container.querySelector('[data-testid="spacing"]').textContent).toBe('12');
+    expect(section.textContent).toContain('×120');
   });
 });

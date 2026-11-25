@@ -53,35 +53,24 @@ describe('MapView', () => {
     expect(container.querySelector('.leaflet-top.leaflet-left .leaflet-control-zoom')).toBeNull();
   });
 
-  it('offers the basemap layers in the map card as thumbnails of their own tiles, with no overlays', () => {
-    const choices = [...container.querySelectorAll('.map-card-base label')];
-    expect(choices.map(label => label.textContent.trim())).toEqual(['Topo', 'Aerial']);
-    const thumbnails = choices.map(label => label.querySelector('.map-card-thumbnail').style.backgroundImage);
-    expect(thumbnails[0]).toContain('ch.swisstopo.pixelkarte-farbe');
-    expect(thumbnails[1]).toContain('ch.swisstopo.swissimage');
-    expect(container.querySelector('.map-card input[type="checkbox"]')).toBeNull();
+  const switcher = () => container.querySelector('.map-view > .map-basemap');
+  const thumbnail = () => switcher().querySelector('.map-basemap-thumbnail').style.backgroundImage;
+
+  it('switches the basemap from a thumbnail of the other layer at the corner of the map', async () => {
+    expect(switcher().closest('.leaflet-container')).toBeNull();
+    expect(switcher().textContent.trim()).toBe('Topo');
+    expect(thumbnail()).toContain('ch.swisstopo.pixelkarte-farbe');
+    expect(container.querySelector('.leaflet-tile-pane .leaflet-layer')).not.toBeNull();
+    await act(async () => switcher().click());
+    expect(switcher().textContent.trim()).toBe('Aerial');
+    expect(thumbnail()).toContain('ch.swisstopo.swissimage');
   });
 
-  it('holds the basemap chooser and the legend in one card, a separator between them', () => {
+  it('holds the legend alone in the card at the top right', () => {
     const card = container.querySelector('.map-card');
-    expect(card).not.toBeNull();
     expect(container.querySelectorAll('.map-card')).toHaveLength(1);
-    const radio = card.querySelector('.map-card-base input[type="radio"]');
-    const title = card.querySelector('.legend-title');
-    const separator = card.querySelector('hr');
-    expect(radio).not.toBeNull();
-    expect(title.textContent).toBe('Redox [mV]');
-    expect(separator).not.toBeNull();
-    expect(radio.compareDocumentPosition(separator) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(separator.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  });
-
-  it('switches the base layer with the radio buttons', async () => {
-    const radios = [...container.querySelectorAll('.map-card-base input[type="radio"]')];
-    expect(radios.map(r => r.checked)).toEqual([false, true]);
-    await act(async () => radios[0].click());
-    expect([...container.querySelectorAll('.map-card-base input[type="radio"]')].map(r => r.checked))
-      .toEqual([true, false]);
+    expect(card.querySelector('.legend-title').textContent).toBe('Redox [mV]');
+    expect(card.querySelector('input, hr')).toBeNull();
   });
 
   it('shows the funder logos as links in one overlay beside the map, outside the leaflet container', () => {

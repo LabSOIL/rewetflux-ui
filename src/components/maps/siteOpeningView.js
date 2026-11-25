@@ -6,20 +6,32 @@ const COVERAGE_MARGIN = 0.02;
 // Space in px kept between a view's edge and a panel that reaches into the map from that edge.
 const PANEL_CLEARANCE = 10;
 
+// A panel's box, or null when it is not in the page or not drawn (hidden, or empty, has no size).
+function drawn(panel) {
+  const box = panel?.getBoundingClientRect();
+  return box && box.width > 0 && box.height > 0 ? box : null;
+}
+
 /**
  * How far the panels reach into the map from its right and bottom edges, in px: the map card
- * at the top right, and at the bottom the higher of the date bar and the logo overlay. Read
- * from the rendered panels; a panel that is not rendered reaches zero.
+ * at the top right, and at the bottom the highest of the date bar, the logo overlay and the
+ * basemap switcher. Read from the drawn panels; a panel that is not drawn reaches zero.
  */
 export function panelReach(map) {
   const container = map.getContainer();
   const edge = container.getBoundingClientRect();
-  const card = container.querySelector('.map-card');
-  const bar = container.closest('.App')?.querySelector('.bottom-bar');
-  const logos = container.closest('.map-view')?.querySelector('.map-logos');
-  const tops = [bar, logos].filter(Boolean).map(panel => panel.getBoundingClientRect().top);
+  const view = container.closest('.map-view');
+  const card = drawn(container.querySelector('.map-card'));
+  const tops = [
+    container.closest('.App')?.querySelector('.bottom-bar'),
+    view?.querySelector('.map-logos'),
+    view?.querySelector('.map-basemap'),
+  ]
+    .map(drawn)
+    .filter(Boolean)
+    .map(box => box.top);
   return {
-    right: card ? Math.max(0, edge.right - card.getBoundingClientRect().left) : 0,
+    right: card ? Math.max(0, edge.right - card.left) : 0,
     bottom: tops.length ? Math.max(0, edge.bottom - Math.min(...tops)) : 0,
   };
 }

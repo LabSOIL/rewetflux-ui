@@ -1,7 +1,8 @@
-import { Suspense, lazy, useEffect } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { MapContainer, Pane, ScaleControl, ZoomControl, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { CatchmentLayers } from './Catchment';
+import { BaseLayers, BaseSwitcher, DEFAULT_BASEMAP_ID } from './Layers';
 import MapLogos from './MapLogos';
 import TowerMarker from './TowerMarker';
 import { MAX_ZOOM } from './basemap';
@@ -74,6 +75,10 @@ export default function MapView({
   redoxMax,
 }) {
   const view = useView();
+  // The basemap is the view's, shared with the 3D scene, when there is one.
+  const [ownBaseId, setOwnBaseId] = useState(DEFAULT_BASEMAP_ID);
+  const baseId = view?.baseId ?? ownBaseId;
+  const setBaseId = view?.setBaseId ?? setOwnBaseId;
   return (
     <div className={`map-view${view?.shown ? ' three-d' : ''}`}>
       <MapContainer
@@ -87,6 +92,7 @@ export default function MapView({
         <Prepare3D />
         <ReturnView />
         <RegisterMap />
+        <BaseLayers baseId={baseId} />
         <Pane name="rasterPane" style={{ zIndex: 450 }} />
         <ZoomControl position="bottomright" />
         <ScaleControl imperial={false} maxWidth={250} />
@@ -111,6 +117,7 @@ export default function MapView({
         </Suspense>
       )}
       <MapLogos />
+      <BaseSwitcher baseId={baseId} onBase={setBaseId} />
     </div>
   );
 }

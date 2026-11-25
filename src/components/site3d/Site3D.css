@@ -130,42 +130,10 @@
     right: 10px;
     z-index: 2;
     box-sizing: border-box;
-    width: 210px;
-    max-width: none;
     /* Clear of the logos, whose top is 167px up from the bottom, scrolling inside when taller */
     max-height: calc(100% - 187px);
     overflow-y: auto;
     font-size: 12px;
-}
-
-.site3d-control-label {
-    display: flex;
-    justify-content: space-between;
-    color: var(--text);
-}
-
-.site3d-control-value {
-    color: var(--accent-text);
-}
-
-.site3d-note {
-    margin: 8px 0 0;
-    color: var(--muted);
-    font-size: 11px;
-}
-
-.site3d-hint {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    z-index: 2;
-    max-width: 260px;
-    padding: 6px 10px;
-    border-radius: 5px;
-    background: color-mix(in srgb, var(--panel) 88%, transparent);
-    color: var(--muted);
-    font-size: 12px;
-    pointer-events: none;
 }
 
 .site3d-tooltip {
@@ -230,11 +198,11 @@
     fill: var(--muted);
 }
 
-/* Above the date bar (its top is 101px up), at the left of the map */
+/* At the left of the map, over the basemap switcher (115px up and 72px tall) */
 .site3d-profile {
     position: absolute;
     left: 10px;
-    bottom: 115px;
+    bottom: 197px;
     z-index: 2;
     padding: 8px 10px 4px;
     border-radius: 5px;

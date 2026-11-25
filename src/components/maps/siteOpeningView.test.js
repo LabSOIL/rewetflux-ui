@@ -13,6 +13,8 @@ const LAYOUT = {
   bar: { left: 110, top: 729, right: 1380, bottom: 800 },
   // The logo overlay sits 115px above the bottom edge: a 40px row with its 6px backing each side.
   logos: { left: 1000, top: 663, right: 1380, bottom: 715 },
+  // The basemap switcher stands at the bottom left, as high above the bottom edge as the logos.
+  basemap: { left: 111, top: 643, right: 183, bottom: 715 },
 };
 const REACH = { right: 150, bottom: 101 };
 
@@ -22,7 +24,7 @@ function placed(el, box) {
 }
 
 // The map's container with its card, inside the app's layout with the date bar beside the map.
-function appWith({ card = true, bar = true, logos = false } = {}) {
+function appWith({ card = true, bar = true, logos = false, basemap = false } = {}) {
   const app = document.createElement('div');
   app.className = 'App';
   const mapView = document.createElement('div');
@@ -39,6 +41,11 @@ function appWith({ card = true, bar = true, logos = false } = {}) {
     const overlay = placed(document.createElement('div'), LAYOUT.logos);
     overlay.className = 'map-logos';
     mapView.appendChild(overlay);
+  }
+  if (basemap) {
+    const switcher = placed(document.createElement('div'), LAYOUT.basemap);
+    switcher.className = 'map-basemap';
+    mapView.appendChild(switcher);
   }
   app.appendChild(mapView);
   if (bar) {
@@ -107,9 +114,20 @@ describe('panelReach', () => {
     expect(panelReach(fakeMap({ container: appWith({ card: false, bar: false }) }))).toEqual({ right: 0, bottom: 0 });
   });
 
+  it('reaches zero for a panel that is in the page but not drawn, such as an empty card', () => {
+    const container = appWith();
+    placed(container.querySelector('.map-card'), { left: 0, top: 0, right: 0, bottom: 0 });
+    expect(panelReach(fakeMap({ container })).right).toBe(0);
+  });
+
   it('reaches up to the logo overlay where the overlay sits above the date bar', () => {
     const reach = panelReach(fakeMap({ container: appWith({ logos: true }) }));
     expect(reach.bottom).toBe(LAYOUT.map.bottom - LAYOUT.logos.top);
+  });
+
+  it('reaches up to the basemap switcher where it stands above the date bar', () => {
+    const reach = panelReach(fakeMap({ container: appWith({ logos: true, basemap: true }) }));
+    expect(reach.bottom).toBe(LAYOUT.map.bottom - LAYOUT.basemap.top);
   });
 });
 

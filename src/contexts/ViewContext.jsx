@@ -3,6 +3,9 @@ import { DEFAULT_BASEMAP_ID } from '../components/maps/basemap';
 
 const ViewContext = createContext(null);
 
+/** The 3D slices' spacing as the site opens: metres of drop per 10 cm of depth at full tilt. */
+export const DEFAULT_LAYER_SPACING = 30;
+
 /** The map zoom whose ground scale the 3D view shows flat when tilting as you zoom; closer in, it tilts. */
 export const FLAT_ZOOM = 17;
 
@@ -37,7 +40,7 @@ export const mapViewOf = map => {
  * `shown` is true while the scene covers the map; `from` is the map's view when 3D opened;
  * `returnTo` is where the scene looked as it handed back, `{ lon, lat, metresPerPixel }`;
  * `crossSection` is whether the 3D view cuts through the ground and the slices, off each time
- * the scene opens.
+ * the scene opens; `layerSpacing` is how far apart its slices hang, in metres per 10 cm of depth.
  */
 export function ViewProvider({ children, start3D = opensIn3D }) {
   const [initially3D] = useState(start3D);
@@ -47,6 +50,7 @@ export function ViewProvider({ children, start3D = opensIn3D }) {
   const [baseId, setBaseId] = useState(DEFAULT_BASEMAP_ID);
   const [returnTo, setReturnTo] = useState(null);
   const [crossSection, setCrossSection] = useState(false);
+  const [layerSpacing, setLayerSpacing] = useState(DEFAULT_LAYER_SPACING);
 
   const open3D = useCallback(view => {
     setFrom(view);
@@ -76,10 +80,12 @@ export function ViewProvider({ children, start3D = opensIn3D }) {
       baseId,
       returnTo,
       crossSection,
+      layerSpacing,
       setBaseId,
       setShown,
       setReturnTo,
       setCrossSection,
+      setLayerSpacing,
       open3D,
       leave3D,
       toggle3D,
@@ -93,6 +99,7 @@ export function ViewProvider({ children, start3D = opensIn3D }) {
       baseId,
       returnTo,
       crossSection,
+      layerSpacing,
       open3D,
       leave3D,
       toggle3D,

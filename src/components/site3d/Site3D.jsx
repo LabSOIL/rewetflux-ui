@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import Slider from '@mui/material/Slider';
 import { getArea, getRedoxProfiles } from '../../data';
 import { getSurroundings, getTerrain } from '../../data/terrain';
 import { useSelection } from '../../contexts/SelectionContext';
-import { FLAT_ZOOM, metresPerPixel, useView } from '../../contexts/ViewContext';
+import { DEFAULT_LAYER_SPACING, FLAT_ZOOM, metresPerPixel, useView } from '../../contexts/ViewContext';
 import { theme } from '../../theme';
 import { getColorScale } from '../../utils/colourMap';
 import { stops } from '../../utils/stops';
 import { BASEMAP_LAYERS } from '../maps/basemap';
-import { BaseChooser } from '../maps/Layers';
 import Legend from '../maps/Legend';
 import {
   DEPTHS,
@@ -34,8 +32,6 @@ const SURROUNDINGS_CELLS = 512;
 const BASEMAP_ZOOM = 19;
 // The surroundings' basemap zoom: about 1.6 m a pixel, 1600 px across, which uploads without a stall.
 const SURROUNDINGS_ZOOM = 16;
-// Metres of drop per 10 cm of depth when the scene opens.
-const DEFAULT_SPACING = 30;
 // The generated variation as a share of the readings' range.
 const NOISE_SHARE = 0.3;
 const NOISE_SEED = 7;
@@ -206,14 +202,6 @@ function CutProfile({ profile, colour, base }) {
   return samples ? <ProfilePanel samples={samples} colour={colour} base={base} /> : null;
 }
 
-const sliderSx = {
-  color: theme.accent,
-  py: '10px',
-  '& .MuiSlider-thumb:hover, & .MuiSlider-thumb.Mui-focusVisible': {
-    boxShadow: 'none',
-  },
-};
-
 /**
  * The site in 3D over the map: it opens from above, framed as the map was, and tilts to show
  * the redox slices at four depths hanging under the ground, with an optional cross-section.
@@ -226,7 +214,6 @@ export default function Site3D() {
   const scene = useRef(null);
   const start = useRef(mapView(model, view.from));
   const [phase, setPhase] = useState('loading');
-  const [spacing, setSpacing] = useState(DEFAULT_SPACING);
   // The cross-section's handles set its direction in degrees and its offset from the polygon's
   // centre as a share of its reach; the rail turns it on and off.
   const [cut, setCut] = useState({ angle: OPENING_CUT_ANGLE, offset: 0 });
@@ -290,7 +277,7 @@ export default function Site3D() {
       (metresPerPixel(FLAT_ZOOM, lat) * holder.current.clientHeight) / 2 / Math.tan((FOV / 2) * (Math.PI / 180));
     const site = new SiteScene(holder.current, {
       ...model,
-      spacing: DEFAULT_SPACING,
+      spacing: DEFAULT_LAYER_SPACING,
       flat,
       onHover: hover.set,
       onPick: selectOption,
@@ -344,8 +331,8 @@ export default function Site3D() {
   }, [cutOn, cutAt, cut]);
 
   useEffect(() => {
-    scene.current.chooseSpacing(spacing);
-  }, [spacing]);
+    scene.current.chooseSpacing(view.layerSpacing);
+  }, [view.layerSpacing]);
 
   useEffect(() => {
     if (phase === 'showing') {
@@ -400,39 +387,10 @@ export default function Site3D() {
   return (
     <>
       {phase === 'loading' && <div className="site3d-loading">Loading the 3D view</div>}
-      <div className={`site3d${visible ? ' visible' : ''}`}>
+      <div className={`site3d${visible ? ' visible' : ''}`} data-phase={phase}>
         <div className="site3d-canvas" ref={holder} />
-        {phase === 'open' && (
-          <div className="site3d-hint">
-            Scroll to zoom, drag to move, right-drag or Shift-drag to turn and tilt. Click a slice to pick its depth.
-            Cross-section in the side bar cuts through them: drag its round handles to move it or turn it. Turn
-            3D layers off to return to the map.
-          </div>
-        )}
         <div className="map-card site3d-card">
-          <BaseChooser name="basemap-3d" baseId={view.baseId} onBase={view.setBaseId} />
-          <hr className="map-card-separator" />
-          <div className="site3d-control">
-            <div className="site3d-control-label">
-              <span>Layer spacing</span>
-              <span className="site3d-control-value">×{spacing * 10}</span>
-            </div>
-            <Slider
-              size="small"
-              min={2}
-              max={60}
-              value={spacing}
-              disabled={phase !== 'open'}
-              onChange={(_, value) => setSpacing(value)}
-              aria-label="Layer spacing"
-              sx={sliderSx}
-            />
-          </div>
-          <hr className="map-card-separator" />
           <Legend {...legend} />
-          <p className="site3d-note">
-            {variable === 'redox' ? 'Slices generated from the probe readings' : 'The slices show redox'}
-          </p>
         </div>
         {cutOn && <CutProfile profile={profile} colour={rasters.colour} base={model.terrain.base} />}
         <HoverTip hover={hover} />

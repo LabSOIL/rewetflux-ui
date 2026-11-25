@@ -5,16 +5,18 @@ Related to the [Sensormap](https://github.com/LabSOIL/sensormap-ui) project, pro
 
 ## 3D view
 
-The site opens on the 2D map. Ticking "Redox layers (3D)" in the map card opens the 3D view: the
+The site opens on the 2D map. Pressing 3D layers in the rail opens the 3D view: the
 ground from swissALTI3D, draped with the chosen basemap, about 2.6 km of surroundings, and the
 redox layers at 5, 15, 25 and 35 cm, the 5 cm one on the ground and each deeper one a step below.
-Unticking it returns to the map at the same place (`?view=3d` opens straight in 3D). The controls
+Pressing it again returns to the map at the same place (`?view=3d` opens straight in 3D). The controls
 follow other 3D maps: scroll zooms, drag moves, right-drag or Shift-drag turns and tilts, Shift
 with the arrows tilts and turns. Zooming in tilts the view and drops the deeper layers, until
 you tilt by hand. Picking a depth peels the layers above it away. The rail's
 Cross-section button, under 3D layers, cuts the landscape and the layers along a line: its two
 move handles slide the cut nearer or further, and the turn handles at its ends turn it (Shift
-snaps to 15°). The layers are generated from the
+snaps to 15°), and the Spacing slider under it sets how far apart the layers hang. The basemap
+switcher at the bottom left swaps between the topographic map and the aerial imagery, in 2D and
+3D alike. The layers are generated from the
 probe readings (inverse-distance weighting plus seeded noise), not measured rasters.
 
 `scripts/terrain.py` writes the height grids, `src/data/terrain.json` for the site and

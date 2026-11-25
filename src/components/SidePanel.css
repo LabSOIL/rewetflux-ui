@@ -54,6 +54,24 @@
     font-size: 20px;
 }
 
+.spacing-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-bottom: 6px;
+    background-color: var(--button);
+    border-bottom: 1px solid var(--panel-border);
+    box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.spacing-section .slot-label {
+    padding-bottom: 10px;
+}
+
+.spacing-section .current-selection {
+    margin-top: 6px;
+}
+
 .button-group button:last-child {
     border-bottom: none;
 }

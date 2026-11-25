@@ -31,6 +31,8 @@ export const theme = {
   mutedOnLight: '#555555',
   logoBackground: '#ffffff',
   shadow: 'rgba(0, 0, 0, 0.5)',
+  // The wash under a name set on a picture, so white text reads over any imagery.
+  scrim: 'rgba(0, 0, 0, 0.75)',
   chart: {
     series: [
       '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
