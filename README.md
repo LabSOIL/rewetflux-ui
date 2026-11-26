@@ -38,6 +38,33 @@ the same spot. It needs FreeCAD's Python modules, NumPy and Matplotlib:
 python3 scripts/tower.py path/to/Tower.stp
 ```
 
+`scripts/flyover/` renders the landing page's background loop, `public/balmoos.mp4`: a drone's view
+of the site about 250 m up, rendered from swisstopo data, not filmed. It glides slowly in one straight
+line at a constant speed, without turning or zooming (the motions that make moving pictures
+sickening), and its last seconds dissolve into its first so that it loops. The trees and buildings are
+the swissSURFACE3D lidar points, coloured from the SWISSIMAGE aerial photo and drawn as soft splats
+that blend into a canopy, over the swissALTI3D ground. The render runs on the GPU at three times the
+size, averaging several exposures per frame, so nothing flickers; it keeps the loop near-lossless
+in the cache and encodes the web video from it, a 15 s loop at 1280x720, 60 fps and 2.7 MB in two
+passes, with its first frame as `public/balmoos.jpg`. The page shows that still at once, starts the
+video only after the rest of the page has loaded, and fades it to 0.55 opacity over its backdrop,
+which lowers the contrast of compression artifacts with it: scored with VMAF as the page shows it,
+the 2.7 MB loop came within a point of a 30 s, 8 MB loop at full opacity. `fetch.py` downloads what it needs (about 3.5 GB
+unpacked) into a cache, `~/.cache/rewetflux-flyover` unless `--cache` says otherwise, and skips what
+is already there; `points.py` colours the points; `render.py` renders and encodes the video. The
+camera, the glide and the encoding are constants at the top of `render.py`; `--altitude`, `--pitch`
+and `--fps` override the camera, `--still FRAME OUT.png` renders one frame to check a change, and
+`--encode-only` re-encodes the cached loop. It needs the GDAL command-line tools, ffmpeg, an
+EGL-capable GPU driver and the packages in `scripts/flyover/requirements.txt`:
+
+```bash
+python3 -m venv .venv && .venv/bin/pip install -r scripts/flyover/requirements.txt
+.venv/bin/python scripts/flyover/fetch.py
+.venv/bin/python scripts/flyover/points.py
+.venv/bin/python scripts/flyover/render.py --list-devices   # pick the GPU
+.venv/bin/python scripts/flyover/render.py --device 1
+```
+
 ## Browser tests
 
 `yarn test` runs the unit tests in jsdom, which has no layout. The checks that need one run in

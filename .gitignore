@@ -26,3 +26,7 @@ dist-ssr
 .env
 *.xml
 package-lock.json
+
+# Python
+__pycache__
+.venv

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import 'leaflet/dist/leaflet.css';
+import PauseIcon from '@mui/icons-material/Pause';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import SitePreview from './SitePreview';
 import ProjectOverlay from './ProjectOverlay';
 import { FUNDERS } from './partners';
@@ -8,37 +10,70 @@ import { canAnimate, expandToWindow } from './expand';
 import './Landing.css';
 
 /**
- * The looping drone footage of the site behind the page, served from `public/`. Until the file
- * is there, or when it fails to load, the page shows its plain backdrop instead.
+ * The looping drone footage of the site behind the page, served from `public/`, as H.264, which
+ * every browser plays, and its first frame as a still that shows until it plays. Until the files are
+ * there, or when the video fails to load, the page shows its plain backdrop instead.
  */
 export const BACKGROUND_VIDEO = './balmoos.mp4';
+export const BACKGROUND_POSTER = './balmoos.jpg';
 
-/** The background footage, playing muted on a loop from the moment the page opens. */
-function BackgroundVideo() {
+/**
+ * The background footage and its play state. The page opens on the still, and the video starts
+ * downloading only once the rest of the page has loaded, then plays muted on a loop, unless the
+ * visitor asks for reduced motion: then the still stays, and nothing downloads until they play it.
+ * The button beside the credit pauses or plays it, as motion that runs on its own needs.
+ */
+function useBackgroundVideo() {
   const ref = useRef(null);
   const [failed, setFailed] = useState(false);
+  const [playing, setPlaying] = useState(false);
 
   // React sets `muted` as a property after the element exists, which some browsers do not count
   // for autoplay, so the video is muted and started here.
-  useEffect(() => {
+  const play = () => {
     const video = ref.current;
     if (!video) return;
     video.muted = true;
     video.play?.()?.catch(() => {});
+  };
+
+  useEffect(() => {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return undefined;
+    if (document.readyState === 'complete') {
+      play();
+      return undefined;
+    }
+    window.addEventListener('load', play, { once: true });
+    return () => window.removeEventListener('load', play);
   }, []);
 
-  return (
+  const toggle = () => (ref.current?.paused ? play() : ref.current?.pause());
+
+  const element = (
     <div className="landing-background" aria-hidden="true">
       {!failed && (
-        <video ref={ref} src={BACKGROUND_VIDEO} muted loop playsInline preload="auto" onError={() => setFailed(true)} />
+        <video
+          ref={ref}
+          src={BACKGROUND_VIDEO}
+          poster={BACKGROUND_POSTER}
+          muted
+          loop
+          playsInline
+          preload="none"
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          onError={() => setFailed(true)}
+        />
       )}
       <div className="landing-background-shade" />
     </div>
   );
+  return { element, failed, playing, toggle };
 }
 
 export default function Landing() {
   const navigate = useNavigate();
+  const video = useBackgroundVideo();
   // The about card's box as it was clicked, which the overlay grows out of; null while closed.
   const [aboutFrom, setAboutFrom] = useState(null);
   const closeAbout = useCallback(() => setAboutFrom(null), []);
@@ -55,7 +90,7 @@ export default function Landing() {
 
   return (
     <>
-      <BackgroundVideo />
+      {video.element}
       <div className="landing-page">
         <header className="landing-header">
           <span className="landing-brand">RewetFlux</span>
@@ -104,12 +139,24 @@ export default function Landing() {
         </main>
 
         <footer className="landing-footer">
-          <p className="landing-credit">
-            Imagery &copy;{' '}
-            <a href="https://www.swisstopo.admin.ch/" target="_blank" rel="noopener noreferrer">
-              swisstopo
-            </a>
-          </p>
+          <div className="landing-footer-start">
+            {!video.failed && (
+              <button
+                type="button"
+                className="landing-video-toggle"
+                onClick={video.toggle}
+                aria-label={video.playing ? 'Pause the background video' : 'Play the background video'}
+              >
+                {video.playing ? <PauseIcon fontSize="small" /> : <PlayArrowIcon fontSize="small" />}
+              </button>
+            )}
+            <p className="landing-credit">
+              Imagery and elevation &copy;{' '}
+              <a href="https://www.swisstopo.admin.ch/" target="_blank" rel="noopener noreferrer">
+                swisstopo
+              </a>
+            </p>
+          </div>
           <div className="landing-logos">
             {FUNDERS.map(f => (
               <a key={f.alt} href={f.href} target="_blank" rel="noopener noreferrer">

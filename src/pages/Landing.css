@@ -31,6 +31,9 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  /* Faded towards the backdrop, which lowers the contrast of the compression's artifacts along with
+     the footage's; scripts/flyover/render.py sizes the video for this opacity. */
+  opacity: 0.55;
 }
 
 /* Darkens the footage so the title and the cards read over any frame of it. */
@@ -207,7 +210,7 @@
 }
 
 /* ---------- Footer ---------- */
-/* The imagery credit at the left, the funders' logos apart at the right. */
+/* The video's pause button and the imagery credit at the left, the funders' logos apart at the right. */
 .landing-footer {
   display: flex;
   align-items: center;
@@ -215,8 +218,32 @@
   gap: 32px;
 }
 
+.landing-footer-start {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-right: auto;
+}
+
+.landing-video-toggle {
+  display: flex;
+  padding: 6px;
+  border: 1px solid color-mix(in srgb, var(--white) 35%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--backdrop-edge) 50%, transparent);
+  color: var(--white);
+  cursor: pointer;
+  opacity: 0.75;
+  transition: opacity 0.25s ease;
+}
+
+.landing-video-toggle:hover,
+.landing-video-toggle:focus-visible {
+  opacity: 1;
+}
+
 .landing-credit {
-  margin: 0 auto 0 0;
+  margin: 0;
   font-size: 11px;
   color: color-mix(in srgb, var(--white) 55%, transparent);
 }
@@ -451,7 +478,7 @@
     gap: 16px;
   }
 
-  .landing-credit {
+  .landing-footer-start {
     margin: 0;
   }
 

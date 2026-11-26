@@ -56,6 +56,21 @@ describe('Landing', () => {
     expect(dialog()).toBeNull();
   });
 
+  it('offers a button that plays or pauses the background footage', () => {
+    const video = container.querySelector('.landing-background video');
+    const button = container.querySelector('.landing-video-toggle');
+    act(() => video.dispatchEvent(new Event('play')));
+    expect(button.getAttribute('aria-label')).toBe('Pause the background video');
+    act(() => video.dispatchEvent(new Event('pause')));
+    expect(button.getAttribute('aria-label')).toBe('Play the background video');
+  });
+
+  it('shows the still until the footage plays, and leaves the footage to load later', () => {
+    const video = container.querySelector('.landing-background video');
+    expect(video.getAttribute('poster')).toBe('./balmoos.jpg');
+    expect(video.getAttribute('preload')).toBe('none');
+  });
+
   it('plays the background footage muted and looped', () => {
     const video = container.querySelector('.landing-background video');
     expect(video.muted).toBe(true);
