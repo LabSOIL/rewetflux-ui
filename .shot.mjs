@@ -1,0 +1,11 @@
+import { firefox } from 'playwright';
+const [dir] = process.argv.slice(2);
+const b = await firefox.launch();
+const page = await b.newPage({ viewport: { width: 1430, height: 830 }, reducedMotion: 'reduce' });
+await page.goto('http://localhost:5317/');
+await page.click('.landing-card-about'); await page.waitForTimeout(300);
+await (await page.$('.landing-overlay-footer')).screenshot({ path: `${dir}/credit-overlay.png` });
+await page.goto('http://localhost:5317/map'); await page.waitForTimeout(1500);
+await page.getByRole('button', { name: 'Info' }).first().click(); await page.waitForTimeout(400);
+await (await page.$('.info-popup')).screenshot({ path: `${dir}/credit-info.png` });
+await b.close();

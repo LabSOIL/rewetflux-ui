@@ -297,8 +297,10 @@
   height: 80vh;
   height: 80dvh;
   overflow-y: auto;
-  padding: 56px clamp(24px, 6vw, 88px) 40px;
+  padding: clamp(16px, 3.5vh, 36px) clamp(16px, 3.5vw, 44px);
   background: var(--panel);
+  /* Its layout follows the card's width (container queries) rather than the window's. */
+  container-type: inline-size;
   color: var(--text);
   border-radius: 10px;
   box-shadow: var(--shadow-overlay);
@@ -309,8 +311,8 @@
 
 .landing-overlay-close {
   position: absolute;
-  top: 16px;
-  right: 16px;
+  top: 12px;
+  right: 12px;
   display: flex;
   padding: 6px;
   border: 0;
@@ -326,20 +328,63 @@
   color: var(--white);
 }
 
+/*
+ * The description's one size, which the overlay sets to the largest at which it fits on the card
+ * (fit.js); everything inside is in em so that it scales with it. Wide cards set the site and the
+ * partners side by side, which shortens the page.
+ */
+.landing-overlay-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.4em 2.5em;
+  font-size: 1rem;
+}
+
+@container (min-width: 720px) {
+  .landing-overlay-body {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    grid-template-areas:
+      'header header'
+      'site partnered'
+      'measured measured'
+      'footer footer';
+  }
+
+  .landing-overlay-header {
+    grid-area: header;
+  }
+
+  .landing-overlay-site {
+    grid-area: site;
+  }
+
+  .landing-overlay-partnered {
+    grid-area: partnered;
+  }
+
+  .landing-overlay-measured {
+    grid-area: measured;
+  }
+
+  .landing-overlay-footer {
+    grid-area: footer;
+  }
+}
+
 .landing-overlay-header {
-  margin-bottom: 32px;
+  padding-right: 40px;
 }
 
 .landing-overlay-kicker {
-  font-size: 0.85rem;
+  font-size: 0.85em;
   letter-spacing: 1.5px;
   text-transform: uppercase;
   color: var(--accent-text);
 }
 
 .landing-overlay-card h2 {
-  margin: 4px 0 12px;
-  font-size: clamp(2rem, 4vw, 3rem);
+  margin: 0.1em 0 0.25em;
+  font-size: 2.6em;
   font-weight: 500;
   color: var(--white);
 }
@@ -347,19 +392,18 @@
 .landing-overlay-lead {
   max-width: 44em;
   margin: 0;
-  font-size: 1.2rem;
-  line-height: 1.55;
+  font-size: 1.2em;
+  line-height: 1.5;
   color: var(--text-strong);
 }
 
 .landing-overlay-card section {
-  max-width: 52em;
-  margin-bottom: 28px;
+  min-width: 0;
 }
 
 .landing-overlay-card h3 {
-  margin: 0 0 8px;
-  font-size: 1.15rem;
+  margin: 0 0 0.5em;
+  font-size: 1.15em;
   font-weight: 600;
   color: var(--accent-text);
 }
@@ -367,8 +411,9 @@
 .landing-overlay-card p,
 .landing-overlay-card dd,
 .landing-overlay-card li {
-  font-size: 1rem;
-  line-height: 1.6;
+  margin: 0;
+  font-size: 1em;
+  line-height: 1.5;
 }
 
 .landing-overlay-card a {
@@ -377,19 +422,19 @@
 
 .landing-overlay-measures {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(14em, 1fr));
+  gap: 1em;
   margin: 0;
 }
 
 .landing-overlay-measures div {
-  padding: 14px 16px;
+  padding: 0.8em 1em;
   background: var(--button);
   border-radius: 6px;
 }
 
 .landing-overlay-measures dt {
-  margin-bottom: 4px;
+  margin-bottom: 0.25em;
   font-weight: 600;
   color: var(--text-strong);
 }
@@ -404,13 +449,24 @@
 }
 
 .landing-overlay-footer {
-  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1em;
+}
+
+/* Who built the site, small and muted at the end of the overlay. */
+.landing-overlay-credit {
+  margin: 0;
+  font-size: 0.8em;
+  color: var(--muted);
 }
 
 .landing-button {
   display: inline-block;
-  padding: 10px 24px;
-  border-radius: 20px;
+  padding: 0.65em 1.5em;
+  border-radius: 2em;
   background: var(--accent);
   color: var(--backdrop-edge) !important;
   font-weight: 600;
@@ -494,6 +550,6 @@
     width: 100vw;
     height: 100dvh;
     border-radius: 0;
-    padding: 56px 16px 32px;
+    padding: 16px;
   }
 }

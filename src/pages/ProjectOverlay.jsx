@@ -2,6 +2,9 @@ import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import CloseIcon from '@mui/icons-material/Close';
 import { EXPAND, boxTransform, canAnimate } from './expand';
+import { COPY } from '../copy';
+import { fitText } from './fit';
+import DeveloperCredit from '../components/DeveloperCredit';
 
 /**
  * The project description over most of the page. It grows out of the box `from`, the card that
@@ -26,6 +29,9 @@ export default function ProjectOverlay({ from, onClose }) {
     },
     [from],
   );
+
+  // The text takes the largest size at which the whole description fits on the card, before it shows.
+  useLayoutEffect(() => fitText(cardRef.current, bodyRef.current), []);
 
   useLayoutEffect(() => {
     if (from && canAnimate(cardRef.current)) play('normal');
@@ -65,57 +71,31 @@ export default function ProjectOverlay({ from, onClose }) {
         <button ref={closeRef} type="button" className="landing-overlay-close" aria-label="Close" onClick={close}>
           <CloseIcon />
         </button>
-        <div ref={bodyRef}>
+        <div ref={bodyRef} className="landing-overlay-body">
           <header className="landing-overlay-header">
-            <span className="landing-overlay-kicker">The project</span>
+            <span className="landing-overlay-kicker">{COPY.overlay.kicker}</span>
             <h2 id="landing-overlay-title">RewetFlux</h2>
-            <p className="landing-overlay-lead">
-              Carbon dynamics in a rewetted peatland: greenhouse gas fluxes, soil redox conditions and microclimate at
-              the Balmoos wetland in Lucerne, Switzerland.
-            </p>
+            <p className="landing-overlay-lead">{COPY.overlay.lead}</p>
           </header>
 
-          <section>
+          <section className="landing-overlay-site">
             <h3>The site</h3>
-            <p>
-              Balmoos is a raised bog in the canton of Lucerne that{' '}
-              <a
-                href="https://www.pronatura-lu.ch/de/balmoos-regeneration-hochmoor"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Pro Natura
-              </a>{' '}
-              is regenerating. Rewetting a drained peatland changes how its soil stores and releases carbon, and the
-              monitoring here follows that change at 25 measurement positions across the site.
-            </p>
+            <p>{COPY.overlay.site}</p>
           </section>
 
-          <section>
+          <section className="landing-overlay-measured">
             <h3>What is measured</h3>
             <dl className="landing-overlay-measures">
-              <div>
-                <dt>Gas flux</dt>
-                <dd>CO₂ and CH₄ exchange between the soil and the air, measured at a collar at each position.</dd>
-              </div>
-              <div>
-                <dt>Redox potential</dt>
-                <dd>Measured at several depths to characterise soil aeration and biogeochemical conditions.</dd>
-              </div>
-              <div>
-                <dt>Temperature and moisture</dt>
-                <dd>
-                  Recorded continuously by{' '}
-                  <a href="https://tomst.com/web/en/systems/tms/tms-4/" target="_blank" rel="noopener noreferrer">
-                    TMS-4 TOMST loggers
-                  </a>
-                  ; soil moisture is given as volumetric water content (m³/m³).
-                </dd>
-              </div>
+              {COPY.overlay.measures.map(m => (
+                <div key={m.name}>
+                  <dt>{m.name}</dt>
+                  <dd>{m.detail}</dd>
+                </div>
+              ))}
             </dl>
           </section>
 
-          <section>
+          <section className="landing-overlay-partnered">
             <h3>Partners</h3>
             <ul className="landing-overlay-partners">
               <li>
@@ -149,6 +129,9 @@ export default function ProjectOverlay({ from, onClose }) {
             <Link to="/map" className="landing-button">
               Explore the site data
             </Link>
+            <p className="landing-overlay-credit">
+              <DeveloperCredit />
+            </p>
           </footer>
         </div>
       </article>

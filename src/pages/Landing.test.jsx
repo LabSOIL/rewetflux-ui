@@ -56,6 +56,17 @@ describe('Landing', () => {
     expect(dialog()).toBeNull();
   });
 
+  it('credits the developer at the end of the overlay, with a link to each profile', () => {
+    act(() => about().click());
+    const credit = dialog().querySelector('.landing-overlay-credit');
+    expect(credit.textContent).toBe('Development: Evan Thomas');
+    expect([...credit.querySelectorAll('a')].map(a => a.getAttribute('aria-label'))).toEqual([
+      'Evan Thomas on GitHub',
+      'Evan Thomas on LinkedIn',
+      'Website of Evan Thomas',
+    ]);
+  });
+
   it('offers a button that plays or pauses the background footage', () => {
     const video = container.querySelector('.landing-background video');
     const button = container.querySelector('.landing-video-toggle');

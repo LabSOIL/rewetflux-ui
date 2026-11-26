@@ -1,0 +1,14 @@
+.developer-credit {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+}
+
+.developer-credit a {
+  display: inline-flex;
+  color: var(--link);
+}
+
+.developer-credit svg {
+  font-size: 1em;
+}

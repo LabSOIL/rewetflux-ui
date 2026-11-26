@@ -6,6 +6,7 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import SitePreview from './SitePreview';
 import ProjectOverlay from './ProjectOverlay';
 import { FUNDERS } from './partners';
+import { COPY } from '../copy';
 import { canAnimate, expandToWindow } from './expand';
 import './Landing.css';
 
@@ -95,12 +96,11 @@ export default function Landing() {
         <header className="landing-header">
           <span className="landing-brand">RewetFlux</span>
           <h1 className="landing-title">
-            <span>CARBON IN A</span>
-            <span>REWETTED PEATLAND</span>
+            {COPY.title.map(line => (
+              <span key={line}>{line}</span>
+            ))}
           </h1>
-          <p className="landing-subtitle">
-            Greenhouse gas fluxes, soil redox and microclimate at the Balmoos wetland, Lucerne
-          </p>
+          <p className="landing-subtitle">{COPY.subtitle}</p>
         </header>
 
         <main className="landing-main">
@@ -109,12 +109,9 @@ export default function Landing() {
               <div className="landing-card-media">
                 <SitePreview />
               </div>
-              <h2 className="landing-card-title">Explore the site</h2>
+              <h2 className="landing-card-title">{COPY.mapCard.title}</h2>
               <div className="landing-card-detail">
-                <p>
-                  The map of the Balmoos monitoring site: gas flux, redox, temperature and moisture at each of its 25
-                  positions, in 2D and 3D.
-                </p>
+                <p>{COPY.mapCard.detail}</p>
               </div>
             </Link>
 
@@ -125,14 +122,11 @@ export default function Landing() {
               aria-haspopup="dialog"
             >
               <div className="landing-card-media landing-card-about-media">
-                <p className="landing-card-about-text">
-                  Rewetting a drained peatland changes how its soil stores and releases carbon. RewetFlux follows that
-                  change at Balmoos, a raised bog under regeneration, with field measurements across the site.
-                </p>
+                <p className="landing-card-about-text">{COPY.aboutCard.summary}</p>
               </div>
-              <h2 className="landing-card-title">About the project</h2>
+              <h2 className="landing-card-title">{COPY.aboutCard.title}</h2>
               <div className="landing-card-detail">
-                <p>The site, what is measured and who is involved.</p>
+                <p>{COPY.aboutCard.detail}</p>
               </div>
             </button>
           </div>
